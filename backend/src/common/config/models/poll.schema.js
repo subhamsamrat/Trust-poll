@@ -1,0 +1,19 @@
+import {pgTable,pgEnum,varchar,uuid,boolean,timestamp} from "drizzle-orm/pg-core";
+import {usersTable} from "./auth.schema.js";
+
+ export const responseMode = pgEnum("response_mode", [
+  "verified",
+  "anonymous",
+]);
+
+export const pollTable = pgTable("polls", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 255 }).notNull(),
+  creatorId: uuid("creator_id").notNull().references(()=>usersTable.id,{onDelete:'cascade'}),
+  isActive: boolean("is_active").default(true).notNull(),
+  responseMode: responseMode().default("verified").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  isPublished: boolean("is_published").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),
+});
