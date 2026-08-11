@@ -6,6 +6,7 @@ import { visitorTable } from "../../common/config/models/visitor.schema.js";
 import { eq } from "drizzle-orm";
 import Api_error from "../../common/utils/Api_error.js";
 import { Generate_visitorId } from "../../common/utils/jwt.js";
+import { usersTable } from "../../common/config/models/auth.schema.js";
 
 //create poll
 export const create_poll = async ({ body, created_by }) => {
@@ -67,24 +68,47 @@ export const delete_poll = async (pollId) => {
   return { success: false };
 };
 
-//visit
-export const visit_poll = async (pollId, user) => {
- 
-    const [poll] = await db
+//update poll
+export const update_poll = async (pollId, user, body) => {
+  const [isExist] = await db
     .select()
     .from(pollTable)
     .where(eq(pollTable.id, pollId));
-    if(!poll){
-      throw Api_error.notFound("poll does not exist");
-    }
+  if (!isExist) {
+    throw Api_error.notFound("poll does not exist");
+  }
+  if (isExist.creatorId !== user.id) {
+    throw Api_error.unauthorized("You are not authorized to update this poll");
+  }
+  const [updatedPoll] = await db
+    .update(pollTable)
+    .set({
+      isPublished: body.isPublished ? body.isPublished : isExist.isPublished,
+    })
+    .where(eq(pollTable.id, isExist.id))
+    .returning({ id: pollTable.id });
+  if (updatedPoll.id) {
+    return { success: true, pollId: updatedPoll.id };
+  }
+  return { success: false };
+};
+
+//visit
+export const visit_poll = async (pollId, user) => {
+  const [poll] = await db
+    .select()
+    .from(pollTable)
+    .where(eq(pollTable.id, pollId));
+  if (!poll) {
+    throw Api_error.notFound("poll does not exist");
+  }
 
   if (poll.responseMode === "verified") {
     if (!user) {
       throw Api_error.unauthorized("You need to login to visit this poll");
     }
-    return { success: true, mode: "verified", visitorId:null };
-
-  } else if (poll.responseMode === "anonymous"){
+    return { success: true, mode: "verified", visitorId: null };
+  } else if (poll.responseMode === "anonymous") {
     const visitId = await Generate_visitorId();
     //insted of store in db we can store in redis for better performance
     await db.insert(visitorTable).values({
@@ -95,5 +119,62 @@ export const visit_poll = async (pollId, user) => {
   }
 };
 
+//get all poll
+export const get_all_poll = async (user) => {
+  const [isExist] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, user.id));
+
+  if (!isExist) {
+    throw Api_error.notFound("user not found");
+  }
+
+  const polls = await db
+    .select()
+    .from(pollTable)
+    .where(eq(pollTable.creatorId, user.id));
+
+  if (!polls || polls.length === 0) {
+    throw Api_error.notFound("no polls found");
+  }
+
+  return polls;
+};
+
+//get poll detail
+export const get_poll_detail = async (pollId, user) => {
+  const [poll] = await db
+    .select()
+    .from(pollTable)
+    .where(eq(pollTable.id, pollId));
+  if (!poll) {
+    throw Api_error.notFound("Poll not found");
+  }
+
+  const questions = await db
+    .select()
+    .from(questionTable)
+    .where(eq(questionTable.pollId, poll.id));
+
+  if (!questions || questions.length <= 0) {
+    throw Api_error.notFound("There is no question in this poll");
+  }
+
+  const formattedQuestions = await Promise.all(
+    questions.map(async (q) => {
+      
+      const options = await db.select().from(optionTable).where(eq(optionTable.questionId, q.id));
+
+      const formattedOptions = options.map((o) => {
+        return {Oid: o.id,option: o.option,};
+      });
+
+      return {Qid: q.id,question: q.question,options: formattedOptions};
+    }),
+  );
+  return { poll: poll, questions: formattedQuestions };
+};
+
 //submit answer
-export const submit_ans = async () =>{};
+export const submit_ans = async () => {};

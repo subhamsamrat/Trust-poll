@@ -36,6 +36,23 @@ export const delete_poll = async (req, res, next) => {
   }
 };
 
+//update poll
+export const update_poll = async (req, res, next) => {
+  try {
+    if (req?.params?.pollId) {
+      const response = await PollService.update_poll(req.params.pollId,req.user, req.body);
+      if (response.success) {
+        Api_response.ok(res, "poll updated successfully");
+      }
+    } else {
+      throw Api_error.notFound("Required data missing");
+    }
+  } catch (error) {
+    console.log("error in updating poll", error);
+    return next(error);
+  }
+};
+
 //visit
 export const visit_poll = async (req, res, next) => {
   try {
@@ -58,6 +75,32 @@ export const visit_poll = async (req, res, next) => {
     }
   } catch (error) {
     console.log("error in generate visitorId", error);
+    return next(error);
+  }
+};
+
+//get all poll
+export const get_all_poll = async (req, res, next) => {
+  try {
+    const polls = await PollService.get_all_poll(req.user);
+    Api_response.ok(res, "Polls retrieved successfully", polls);
+  } catch (error) {
+    console.log("error in getting polls", error);
+    return next(error);
+  }
+};
+
+//get poll detail
+export const get_poll_detail = async (req, res, next) => {
+  try {
+    if (req?.params?.pollId) {
+      const poll = await PollService.get_poll_detail(req.params.pollId, req.user);
+      Api_response.ok(res, "Poll detail retrieved successfully", poll);
+    } else {
+      throw Api_error.notFound("Required data missing");
+    }
+  } catch (error) {
+    console.log("error in getting poll detail", error);
     return next(error);
   }
 };
