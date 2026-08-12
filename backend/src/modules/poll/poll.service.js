@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { db } from "../../common/config/db.js";
 import { pollTable } from "../../common/config/models/poll.schema.js";
 import { questionTable } from "../../common/config/models/question.schema.js";
@@ -7,6 +8,8 @@ import { eq } from "drizzle-orm";
 import Api_error from "../../common/utils/Api_error.js";
 import { Generate_visitorId } from "../../common/utils/jwt.js";
 import { usersTable } from "../../common/config/models/auth.schema.js";
+
+const hashToken = (token) =>crypto.createHash("sha256").update(token).digest("hex");
 
 //create poll
 export const create_poll = async ({ body, created_by }) => {
@@ -143,16 +146,42 @@ export const get_all_poll = async (user) => {
 };
 
 //get poll detail
-export const get_poll_detail = async (pollId, user) => {
+export const get_poll_detail = async (pollId, req) => {
+
+  //check if user is verified or anonymous
+  if (req.user) {
+    const [isExist] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id));
+    if (!isExist) {
+      throw Api_error.unauthorized();
+    }
+  } else if (req.cookies.visitorId) {
+    const hashedVisitorId = hashToken(req.cookies.visitorId);
+    const [isExist] = await db
+      .select()
+      .from(visitorTable)
+      .where(eq(visitorTable.visitorId, hashedVisitorId));
+    if (!isExist) {
+      throw Api_error.unauthorized();
+    }
+  } else {
+    throw Api_error.unauthorized();
+  }
+
+  //check if poll exist and get questions and options
   const [poll] = await db
     .select()
     .from(pollTable)
     .where(eq(pollTable.id, pollId));
   if (!poll) {
+       console.log("poll:==",poll);
+           
     throw Api_error.notFound("Poll not found");
   }
 
-  const questions = await db
+  const questions = await db      //get questions of the poll
     .select()
     .from(questionTable)
     .where(eq(questionTable.pollId, poll.id));
@@ -161,19 +190,22 @@ export const get_poll_detail = async (pollId, user) => {
     throw Api_error.notFound("There is no question in this poll");
   }
 
+  //convert questions and options to required format
   const formattedQuestions = await Promise.all(
     questions.map(async (q) => {
-      
-      const options = await db.select().from(optionTable).where(eq(optionTable.questionId, q.id));
+      const options = await db
+        .select()
+        .from(optionTable)
+        .where(eq(optionTable.questionId, q.id));
 
       const formattedOptions = options.map((o) => {
-        return {Oid: o.id,option: o.option,};
+        return { Oid: o.id, option: o.option };
       });
 
-      return {Qid: q.id,question: q.question,options: formattedOptions};
+      return { Qid: q.id, question: q.question, options: formattedOptions };
     }),
   );
-  return { poll: poll, questions: formattedQuestions };
+  return { poll: poll, questions: formattedQuestions };  //return poll and questions in required format
 };
 
 //submit answer

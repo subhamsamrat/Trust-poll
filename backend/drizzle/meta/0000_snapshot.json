@@ -1,5 +1,5 @@
 {
-  "id": "3fc77d5c-6377-42f3-94a7-6e6064857664",
+  "id": "492decd3-82ef-4c78-b9a4-93b9be80dc70",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -19,10 +19,22 @@
           "name": "submitted_by",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "visitor_id": {
+          "name": "visitor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "question_id": {
           "name": "question_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "answer": {
+          "name": "answer",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -50,12 +62,38 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "answerTable_visitor_id_visitors_visitor_id_fk": {
+          "name": "answerTable_visitor_id_visitors_visitor_id_fk",
+          "tableFrom": "answerTable",
+          "tableTo": "visitors",
+          "columnsFrom": [
+            "visitor_id"
+          ],
+          "columnsTo": [
+            "visitor_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "answerTable_question_id_questions_id_fk": {
           "name": "answerTable_question_id_questions_id_fk",
           "tableFrom": "answerTable",
           "tableTo": "questions",
           "columnsFrom": [
             "question_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "answerTable_answer_options_id_fk": {
+          "name": "answerTable_answer_options_id_fk",
+          "tableFrom": "answerTable",
+          "tableTo": "options",
+          "columnsFrom": [
+            "answer"
           ],
           "columnsTo": [
             "id"
@@ -215,7 +253,7 @@
           "name": "is_active",
           "type": "boolean",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "default": true
         },
         "responseMode": {
@@ -223,7 +261,7 @@
           "type": "response_mode",
           "typeSchema": "public",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "default": "'verified'"
         },
         "expires_at": {
@@ -236,14 +274,14 @@
           "name": "is_published",
           "type": "boolean",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "default": false
         },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "default": "now()"
         },
         "updated_at": {
@@ -311,6 +349,52 @@
         "questions_poll_id_polls_id_fk": {
           "name": "questions_poll_id_polls_id_fk",
           "tableFrom": "questions",
+          "tableTo": "polls",
+          "columnsFrom": [
+            "poll_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.visitors": {
+      "name": "visitors",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "poll_id": {
+          "name": "poll_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "visitor_id": {
+          "name": "visitor_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "visitors_poll_id_polls_id_fk": {
+          "name": "visitors_poll_id_polls_id_fk",
+          "tableFrom": "visitors",
           "tableTo": "polls",
           "columnsFrom": [
             "poll_id"

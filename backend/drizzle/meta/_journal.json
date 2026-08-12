@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1781960070221,
-      "tag": "0000_optimal_wendell_rand",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1786358651307,
-      "tag": "0001_mature_jamie_braddock",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1786360425005,
-      "tag": "0002_stale_young_avengers",
+      "when": 1786529370280,
+      "tag": "0000_eminent_gauntlet",
       "breakpoints": true
     }
   ]

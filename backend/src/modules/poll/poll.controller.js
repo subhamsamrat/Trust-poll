@@ -92,9 +92,9 @@ export const get_all_poll = async (req, res, next) => {
 
 //get poll detail
 export const get_poll_detail = async (req, res, next) => {
-  try {
+  try { 
     if (req?.params?.pollId) {
-      const poll = await PollService.get_poll_detail(req.params.pollId, req.user);
+      const poll = await PollService.get_poll_detail(req.params.pollId, req);
       Api_response.ok(res, "Poll detail retrieved successfully", poll);
     } else {
       throw Api_error.notFound("Required data missing");
@@ -108,13 +108,19 @@ export const get_poll_detail = async (req, res, next) => {
 //answer poll
 export const answer_poll = async (req, res, next) => {
   try {
-    if (req?.params?.pollId) {
-      const response = await PollService.submit_ans();
-      if (response.success) {
+      
+
+    if (req?.params?.pollId){
+
+      const response = await PollService.submit_ans(req.params.pollId, req.user, req.body, req.cookies.visitorId);
+      if (response.success){
         Api_response.ok(res, "Answer submitted successfully");
       }
     } else {
       throw Api_error.notFound("Required data missing");
     }
-  } catch (error) {}
+  } catch (error) {
+    console.log("error in submitting answer", error);
+    return next(error);
+  }
 };

@@ -11,7 +11,7 @@ poll_router.post("/create",accessVerifyMiddleware,dto_middleware(create_poll_dto
 poll_router.delete("/delete/:pollId",accessVerifyMiddleware,Poll_controller.delete_poll);
 poll_router.patch("/update/:pollId",accessVerifyMiddleware,Poll_controller.update_poll);
 
-poll_router.get("/all-polls",optionalAuthMiddleware,Poll_controller.get_all_poll);
+poll_router.get("/all-polls",accessVerifyMiddleware,Poll_controller.get_all_poll);
 poll_router.get("/detail/:pollId",optionalAuthMiddleware,Poll_controller.get_poll_detail);
 
 poll_router.post("/visit/:pollId",optionalAuthMiddleware,Poll_controller.visit_poll);  

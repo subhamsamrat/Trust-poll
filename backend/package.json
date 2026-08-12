@@ -22,7 +22,6 @@
     "express": "^5.2.1",
     "joi": "^18.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.6.2",
     "postgres": "^3.4.9",
     "zod": "^4.4.3"
   },
