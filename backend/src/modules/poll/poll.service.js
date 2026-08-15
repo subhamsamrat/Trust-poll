@@ -4,12 +4,13 @@ import { pollTable } from "../../common/config/models/poll.schema.js";
 import { questionTable } from "../../common/config/models/question.schema.js";
 import { optionTable } from "../../common/config/models/option.schema.js";
 import { visitorTable } from "../../common/config/models/visitor.schema.js";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import Api_error from "../../common/utils/Api_error.js";
 import { Generate_visitorId } from "../../common/utils/jwt.js";
 import { usersTable } from "../../common/config/models/auth.schema.js";
 
-const hashToken = (token) =>crypto.createHash("sha256").update(token).digest("hex");
+const hashToken = (token) =>
+  crypto.createHash("sha256").update(token).digest("hex");
 
 //create poll
 export const create_poll = async ({ body, created_by }) => {
@@ -21,6 +22,7 @@ export const create_poll = async ({ body, created_by }) => {
         creatorId: created_by,
         isActive: body.isActive,
         responseMode: body.responseMode,
+        startsAt: body.startsAt,
         expiresAt: body.expiresAt,
         isPublished: body.isPublished,
       })
@@ -147,16 +149,9 @@ export const get_all_poll = async (user) => {
 
 //get poll detail
 export const get_poll_detail = async (pollId, req) => {
-
   //check if user is verified or anonymous
-  if (req.user) {
-    const [isExist] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, req.user.id));
-    if (!isExist) {
-      throw Api_error.unauthorized();
-    }
+  if (req.user?.id) {
+    //user is verified
   } else if (req.cookies.visitorId) {
     const hashedVisitorId = hashToken(req.cookies.visitorId);
     const [isExist] = await db
@@ -168,45 +163,100 @@ export const get_poll_detail = async (pollId, req) => {
     }
   } else {
     throw Api_error.unauthorized();
-  }
+  } 
 
-  //check if poll exist and get questions and options
+  //check if poll exist or not
   const [poll] = await db
     .select()
     .from(pollTable)
     .where(eq(pollTable.id, pollId));
   if (!poll) {
-       console.log("poll:==",poll);
-           
     throw Api_error.notFound("Poll not found");
   }
 
-  const questions = await db      //get questions of the poll
-    .select()
-    .from(questionTable)
-    .where(eq(questionTable.pollId, poll.id));
+  //function get all questions and options of the poll
+  const getQuestionsAndOptions = async (pollId) => {
+    const questions = await db
+      .select()
+      .from(questionTable)
+      .where(eq(questionTable.pollId, pollId));
 
-  if (!questions || questions.length <= 0) {
-    throw Api_error.notFound("There is no question in this poll");
+    if (questions.length === 0) {
+      throw Api_error.notFound("There is no question in this poll");
+    }
+
+    const questionIds = questions.map((q) => q.id);
+
+    const options = await db
+      .select()
+      .from(optionTable)
+      .where(inArray(optionTable.questionId, questionIds));
+
+    return questions.map((q) => ({
+      Qid: q.id,
+      question: q.question,
+      options: options
+        .filter((o) => o.questionId === q.id)
+        .map((o) => ({
+          Oid: o.id,
+          option: o.option,
+        })),
+    }));
+  };
+
+  //this condition is become true when user is verified and he is the creator of the poll
+  if (req.user && poll.creatorId === req.user.id) {
+    return { poll: poll, questions: await getQuestionsAndOptions(poll.id) }; //return poll and questions in required format      
   }
 
-  //convert questions and options to required format
-  const formattedQuestions = await Promise.all(
-    questions.map(async (q) => {
-      const options = await db
-        .select()
-        .from(optionTable)
-        .where(eq(optionTable.questionId, q.id));
+  // Check whether poll is active
+  const now = new Date();
 
-      const formattedOptions = options.map((o) => {
-        return { Oid: o.id, option: o.option };
-      });
+  if (poll.startsAt > now) {
+    throw Api_error.badRequest("Poll has not started yet");
+  }
 
-      return { Qid: q.id, question: q.question, options: formattedOptions };
-    }),
-  );
-  return { poll: poll, questions: formattedQuestions };  //return poll and questions in required format
+  if (poll.expiresAt < now) {
+    throw Api_error.badRequest("Poll has expired");
+  }
+
+  return { poll: poll, questions: await getQuestionsAndOptions(poll.id) }; //return poll and questions in required format
 };
 
 //submit answer
-export const submit_ans = async () => {};
+export const submit_ans = async (pollId, user, answer, visitorId) => {
+  //check if user is verified or anonymous
+  let submittedBy = { verifiedUser: null, anonymousUser: null };
+  if (user) {
+    const [isExist] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, user.id));
+    if (!isExist) {
+      throw Api_error.unauthorized();
+    }
+    submittedBy.verifiedUser = user.id;
+  } else if (visitorId) {
+    const hashedVisitorId = hashToken(visitorId);
+    const [isExist] = await db
+      .select()
+      .from(visitorTable)
+      .where(eq(visitorTable.visitorId, hashedVisitorId));
+    if (!isExist) {
+      throw Api_error.unauthorized();
+    }
+    submittedBy.anonymousUser = visitorId;
+  } else {
+    throw Api_error.unauthorized();
+  }
+
+  const [poll] = await db
+    .select()
+    .from(pollTable)
+    .where(eq(pollTable.id, pollId));
+  if (!poll) {
+    throw Api_error.notFound("poll does not exist");
+  }
+
+
+};

@@ -9,7 +9,8 @@
     "start": "node --watch server.js",
     "studio": "drizzle-kit studio",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "npx drizzle-kit push"
   },
   "keywords": [],
   "author": "",

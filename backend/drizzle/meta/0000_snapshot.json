@@ -1,5 +1,5 @@
 {
-  "id": "492decd3-82ef-4c78-b9a4-93b9be80dc70",
+  "id": "c4227cb5-2b4c-4225-bf65-c9062d05997b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -15,14 +15,14 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "submitted_by": {
-          "name": "submitted_by",
+        "verified_user": {
+          "name": "verified_user",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "visitor_id": {
-          "name": "visitor_id",
+        "anonymous_user": {
+          "name": "anonymous_user",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -49,12 +49,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "answerTable_submitted_by_users_id_fk": {
-          "name": "answerTable_submitted_by_users_id_fk",
+        "answerTable_verified_user_users_id_fk": {
+          "name": "answerTable_verified_user_users_id_fk",
           "tableFrom": "answerTable",
           "tableTo": "users",
           "columnsFrom": [
-            "submitted_by"
+            "verified_user"
           ],
           "columnsTo": [
             "id"
@@ -62,15 +62,15 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "answerTable_visitor_id_visitors_visitor_id_fk": {
-          "name": "answerTable_visitor_id_visitors_visitor_id_fk",
+        "answerTable_anonymous_user_visitors_id_fk": {
+          "name": "answerTable_anonymous_user_visitors_id_fk",
           "tableFrom": "answerTable",
           "tableTo": "visitors",
           "columnsFrom": [
-            "visitor_id"
+            "anonymous_user"
           ],
           "columnsTo": [
-            "visitor_id"
+            "id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -263,6 +263,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'verified'"
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         },
         "expires_at": {
           "name": "expires_at",

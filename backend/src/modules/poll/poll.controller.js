@@ -108,8 +108,6 @@ export const get_poll_detail = async (req, res, next) => {
 //answer poll
 export const answer_poll = async (req, res, next) => {
   try {
-      
-
     if (req?.params?.pollId){
 
       const response = await PollService.submit_ans(req.params.pollId, req.user, req.body, req.cookies.visitorId);
