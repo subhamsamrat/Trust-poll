@@ -27,6 +27,5 @@ export const resetToken=()=>{
 }
 export const Generate_visitorId=()=>{
     const rawId=crypto.randomBytes(32).toString('hex');
-    const hashedId=crypto.createHash("sha256").update(rawId).digest('hex');
-    return {rawId, hashedId};
+    return {rawId};
 }

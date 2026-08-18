@@ -8,6 +8,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import Api_error from "../../common/utils/Api_error.js";
 import { Generate_visitorId } from "../../common/utils/jwt.js";
 import { usersTable } from "../../common/config/models/auth.schema.js";
+import { answerTable } from "../../common/config/models/answer.schema.js";
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
@@ -20,7 +21,6 @@ export const create_poll = async ({ body, created_by }) => {
       .values({
         title: body.title,
         creatorId: created_by,
-        isActive: body.isActive,
         responseMode: body.responseMode,
         startsAt: body.startsAt,
         expiresAt: body.expiresAt,
@@ -118,7 +118,7 @@ export const visit_poll = async (pollId, user) => {
     //insted of store in db we can store in redis for better performance
     await db.insert(visitorTable).values({
       pollId: pollId,
-      visitorId: visitId.hashedId,
+      visitorId: visitId.rawId,
     });
     return { success: true, mode: "anonymous", visitorId: visitId.rawId };
   }
@@ -153,17 +153,16 @@ export const get_poll_detail = async (pollId, req) => {
   if (req.user?.id) {
     //user is verified
   } else if (req.cookies.visitorId) {
-    const hashedVisitorId = hashToken(req.cookies.visitorId);
     const [isExist] = await db
       .select()
       .from(visitorTable)
-      .where(eq(visitorTable.visitorId, hashedVisitorId));
+      .where(eq(visitorTable.visitorId, req.cookies.visitorId));
     if (!isExist) {
       throw Api_error.unauthorized();
     }
   } else {
     throw Api_error.unauthorized();
-  } 
+  }
 
   //check if poll exist or not
   const [poll] = await db
@@ -206,7 +205,7 @@ export const get_poll_detail = async (pollId, req) => {
 
   //this condition is become true when user is verified and he is the creator of the poll
   if (req.user && poll.creatorId === req.user.id) {
-    return { poll: poll, questions: await getQuestionsAndOptions(poll.id) }; //return poll and questions in required format      
+    return { poll: poll, questions: await getQuestionsAndOptions(poll.id) }; //return poll and questions in required format
   }
 
   // Check whether poll is active
@@ -225,38 +224,133 @@ export const get_poll_detail = async (pollId, req) => {
 
 //submit answer
 export const submit_ans = async (pollId, user, answer, visitorId) => {
-  //check if user is verified or anonymous
-  let submittedBy = { verifiedUser: null, anonymousUser: null };
-  if (user) {
-    const [isExist] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, user.id));
-    if (!isExist) {
+
+  await db.transaction(async (tx) => {
+    //check if user is verified or anonymous
+    let submittedBy = { verifiedUser: null, anonymousUser: null };
+    if (user?.id) {
+      submittedBy.verifiedUser = user.id;
+    } else if (visitorId) {
+      const [isExist] = await tx
+        .select()
+        .from(visitorTable)
+        .where(eq(visitorTable.visitorId, visitorId));
+      if (!isExist) {
+        throw Api_error.unauthorized();
+      }
+      submittedBy.anonymousUser = visitorId;
+    } else {
       throw Api_error.unauthorized();
     }
-    submittedBy.verifiedUser = user.id;
-  } else if (visitorId) {
-    const hashedVisitorId = hashToken(visitorId);
-    const [isExist] = await db
+
+    //check poll exist or not
+    const [poll] = await tx
       .select()
-      .from(visitorTable)
-      .where(eq(visitorTable.visitorId, hashedVisitorId));
-    if (!isExist) {
-      throw Api_error.unauthorized();
+      .from(pollTable)
+      .where(eq(pollTable.id, pollId));
+    if (!poll) {
+      throw Api_error.notFound("poll does not exist");
     }
-    submittedBy.anonymousUser = visitorId;
-  } else {
-    throw Api_error.unauthorized();
-  }
+    if (poll.responseMode === "verified" && !user?.id) {
+      throw Api_error.unauthorized(
+        "You must be logged in to answer this poll.",
+      );
+    }
 
-  const [poll] = await db
-    .select()
-    .from(pollTable)
-    .where(eq(pollTable.id, pollId));
-  if (!poll) {
-    throw Api_error.notFound("poll does not exist");
-  }
+    if (poll.responseMode === "anonymous" && !visitorId) {
+      throw Api_error.unauthorized("Visitor verification failed.");
+    }
 
+    if (poll.startsAt > new Date()) {
+      throw Api_error.badRequest("Poll is not active yet.");
+    } else if (poll.expiresAt < new Date()) {
+      throw Api_error.badRequest("Poll has expired.");
+    }
 
+    if (!answer?.answers || !Array.isArray(answer.answers) || answer.answers.length === 0) {
+      throw Api_error.badRequest("No answers provided.");
+    }
+
+    const questions = answer.answers.map((q) => q.questionId);
+
+    //Verify that every question belongs to the current poll
+    const pollQuestions = await tx
+      .select({ id: questionTable.id })
+      .from(questionTable)
+      .where(eq(questionTable.pollId, pollId));
+
+    const pollQuestionIdSet = new Set(pollQuestions.map((q) => q.id));
+
+    for (const qId of questions) {
+      if (!pollQuestionIdSet.has(qId)) {
+        throw Api_error.badrequest("One or more questions do not belong to this poll.");
+      }
+    }
+
+    //Verify that every option belongs to its corresponding question
+    const optionIds = answer.answers.map((ans) => ans.optionId);
+    const validOptions = await tx
+      .select({
+        id: optionTable.id,
+        questionId: optionTable.questionId,
+      })
+      .from(optionTable)
+      .where(inArray(optionTable.id, optionIds));
+
+    const optionQuestionMap = new Map(
+      validOptions.map((opt) => [opt.id, opt.questionId])
+    );
+
+    for (const ans of answer.answers) {
+      const associatedQuestionId = optionQuestionMap.get(ans.optionId);
+      if (!associatedQuestionId || associatedQuestionId !== ans.questionId) {
+        throw Api_error.badRequest("One or more options do not belong to the specified question.");
+      }
+    }
+
+    //check same user aleardy submitted or not answer
+    const condition = submittedBy.verifiedUser
+      ? and(
+          eq(answerTable.verifiedUser, submittedBy.verifiedUser),
+          inArray(answerTable.questionId,questions),
+        )
+      : and(
+          eq(answerTable.anonymousUser, submittedBy.anonymousUser),
+          inArray(answerTable.questionId,questions),
+        );
+
+    const existingAnswer = await tx
+      .select()
+      .from(answerTable)
+      .where(condition)
+      .limit(1);
+
+    if (existingAnswer.length > 0) {
+      throw Api_error.badrequest(
+        "You have already submitted answers for this poll."
+      );
+    }
+
+    const values = answer.answers.map((ans) => ({
+      verifiedUser: submittedBy.verifiedUser,
+      anonymousUser: submittedBy.anonymousUser,
+      questionId: ans.questionId,
+      answer: ans.optionId,
+    }));
+
+    const inserted = await tx
+      .insert(answerTable)
+      .values(values)
+      .returning({ id: answerTable.id });
+
+    if (!inserted || inserted.length !== answer.answers.length) {
+      throw Api_error.badRequest("Answer submission failed.");
+    }
+  });
+  return { success: true };
 };
+
+//dashboard
+export const dashboard=async()=>{
+  
+}

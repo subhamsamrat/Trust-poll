@@ -2,7 +2,7 @@ CREATE TYPE "public"."response_mode" AS ENUM('verified', 'anonymous');--> statem
 CREATE TABLE "answerTable" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"verified_user" uuid,
-	"anonymous_user" uuid,
+	"anonymous_user" varchar,
 	"question_id" uuid NOT NULL,
 	"answer" uuid NOT NULL,
 	"created_at" timestamp DEFAULT now()
@@ -30,7 +30,6 @@ CREATE TABLE "polls" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"title" varchar(255) NOT NULL,
 	"creator_id" uuid NOT NULL,
-	"is_active" boolean DEFAULT true NOT NULL,
 	"responseMode" "response_mode" DEFAULT 'verified' NOT NULL,
 	"starts_at" timestamp DEFAULT now() NOT NULL,
 	"expires_at" timestamp NOT NULL,
@@ -49,11 +48,12 @@ CREATE TABLE "questions" (
 CREATE TABLE "visitors" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"poll_id" uuid NOT NULL,
-	"visitor_id" varchar NOT NULL
+	"visitor_id" varchar NOT NULL,
+	CONSTRAINT "visitors_visitor_id_unique" UNIQUE("visitor_id")
 );
 --> statement-breakpoint
 ALTER TABLE "answerTable" ADD CONSTRAINT "answerTable_verified_user_users_id_fk" FOREIGN KEY ("verified_user") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "answerTable" ADD CONSTRAINT "answerTable_anonymous_user_visitors_id_fk" FOREIGN KEY ("anonymous_user") REFERENCES "public"."visitors"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "answerTable" ADD CONSTRAINT "answerTable_anonymous_user_visitors_visitor_id_fk" FOREIGN KEY ("anonymous_user") REFERENCES "public"."visitors"("visitor_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "answerTable" ADD CONSTRAINT "answerTable_question_id_questions_id_fk" FOREIGN KEY ("question_id") REFERENCES "public"."questions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "answerTable" ADD CONSTRAINT "answerTable_answer_options_id_fk" FOREIGN KEY ("answer") REFERENCES "public"."options"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "options" ADD CONSTRAINT "options_question_id_questions_id_fk" FOREIGN KEY ("question_id") REFERENCES "public"."questions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

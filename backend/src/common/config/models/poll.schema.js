@@ -10,7 +10,6 @@ export const pollTable = pgTable("polls", {
   id: uuid("id").primaryKey().defaultRandom(),
   title: varchar("title", { length: 255 }).notNull(),
   creatorId: uuid("creator_id").notNull().references(()=>usersTable.id,{onDelete:'cascade'}),
-  isActive: boolean("is_active").default(true).notNull(),
   responseMode: responseMode().default("verified").notNull(),
   startsAt: timestamp("starts_at").notNull().defaultNow(),
   expiresAt: timestamp("expires_at").notNull(),

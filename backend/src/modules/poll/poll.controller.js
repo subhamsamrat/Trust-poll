@@ -109,7 +109,6 @@ export const get_poll_detail = async (req, res, next) => {
 export const answer_poll = async (req, res, next) => {
   try {
     if (req?.params?.pollId){
-
       const response = await PollService.submit_ans(req.params.pollId, req.user, req.body, req.cookies.visitorId);
       if (response.success){
         Api_response.ok(res, "Answer submitted successfully");
@@ -122,3 +121,18 @@ export const answer_poll = async (req, res, next) => {
     return next(error);
   }
 };
+
+//dashboard
+export const Dashboard=async (req,res,next)=>{
+  try {
+    if(req.user?.id){
+         const response =await PollService.dashboard(req.user.id);
+         if(response.success===true){
+          Api_response.ok(res,"data fetch successfully",response);
+         }
+    }
+  } catch (error) {
+    console.log("Error in dashboard controller",error);
+    next(error);
+  }
+}

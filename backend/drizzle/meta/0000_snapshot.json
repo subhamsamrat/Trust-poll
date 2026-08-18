@@ -1,5 +1,5 @@
 {
-  "id": "c4227cb5-2b4c-4225-bf65-c9062d05997b",
+  "id": "203d7d2e-52e5-4b64-a581-1f2d161e98b9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -23,7 +23,7 @@
         },
         "anonymous_user": {
           "name": "anonymous_user",
-          "type": "uuid",
+          "type": "varchar",
           "primaryKey": false,
           "notNull": false
         },
@@ -62,15 +62,15 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "answerTable_anonymous_user_visitors_id_fk": {
-          "name": "answerTable_anonymous_user_visitors_id_fk",
+        "answerTable_anonymous_user_visitors_visitor_id_fk": {
+          "name": "answerTable_anonymous_user_visitors_visitor_id_fk",
           "tableFrom": "answerTable",
           "tableTo": "visitors",
           "columnsFrom": [
             "anonymous_user"
           ],
           "columnsTo": [
-            "id"
+            "visitor_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -249,13 +249,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
         "responseMode": {
           "name": "responseMode",
           "type": "response_mode",
@@ -414,7 +407,15 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "visitors_visitor_id_unique": {
+          "name": "visitors_visitor_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "visitor_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
