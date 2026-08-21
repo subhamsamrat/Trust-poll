@@ -136,3 +136,19 @@ export const Dashboard=async (req,res,next)=>{
     next(error);
   }
 }
+
+
+//search
+export const search = async (req, res, next) => {
+  try {
+    if (req.user?.id) {
+      const polls = await PollService.search(req.user.id, req.query);
+      Api_response.ok(res, "Search results fetched successfully", polls);
+    } else {
+      throw Api_error.unauthorized("User authentication required");
+    }
+  } catch (error) {
+    console.log("Error in search controller", error);
+    next(error);
+  }
+};

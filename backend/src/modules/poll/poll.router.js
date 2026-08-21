@@ -13,7 +13,8 @@ poll_router.delete("/delete/:pollId",accessVerifyMiddleware,Poll_controller.dele
 poll_router.patch("/update/:pollId",accessVerifyMiddleware,Poll_controller.update_poll);
 
 poll_router.get("/all-polls",accessVerifyMiddleware,Poll_controller.get_all_poll);
-poll_router.get("/dashboard",accessVerifyMiddleware,Poll_controller);
+poll_router.get("/dashboard",accessVerifyMiddleware,Poll_controller.Dashboard);
+poll_router.get("/search",accessVerifyMiddleware,Poll_controller.search);
 poll_router.get("/detail/:pollId",optionalAuthMiddleware,Poll_controller.get_poll_detail);
 
 

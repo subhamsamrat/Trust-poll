@@ -4,7 +4,7 @@ import { pollTable } from "../../common/config/models/poll.schema.js";
 import { questionTable } from "../../common/config/models/question.schema.js";
 import { optionTable } from "../../common/config/models/option.schema.js";
 import { visitorTable } from "../../common/config/models/visitor.schema.js";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, ilike, lte, gte, lt } from "drizzle-orm";
 import Api_error from "../../common/utils/Api_error.js";
 import { Generate_visitorId } from "../../common/utils/jwt.js";
 import { usersTable } from "../../common/config/models/auth.schema.js";
@@ -224,18 +224,18 @@ export const get_poll_detail = async (pollId, req) => {
 
 //submit answer
 export const submit_ans = async (pollId, user, answer, visitorId) => {
-
   await db.transaction(async (tx) => {
     //check if user is verified or anonymous
     let submittedBy = { verifiedUser: null, anonymousUser: null };
     if (user?.id) {
       submittedBy.verifiedUser = user.id;
-    } else if (visitorId) {
+    } else if (visitorId && user === null) {
       const [isExist] = await tx
-        .select()
-        .from(visitorTable)
-        .where(eq(visitorTable.visitorId, visitorId));
-      if (!isExist) {
+        .select({ visitorId: visitorTable.visitorId }).from(visitorTable).where(and(
+            eq(visitorTable.pollId, pollId),
+            eq(visitorTable.visitorId, visitorId)));
+      
+      if (!isExist){
         throw Api_error.unauthorized();
       }
       submittedBy.anonymousUser = visitorId;
@@ -267,7 +267,11 @@ export const submit_ans = async (pollId, user, answer, visitorId) => {
       throw Api_error.badRequest("Poll has expired.");
     }
 
-    if (!answer?.answers || !Array.isArray(answer.answers) || answer.answers.length === 0) {
+    if (
+      !answer?.answers ||
+      !Array.isArray(answer.answers) ||
+      answer.answers.length === 0
+    ) {
       throw Api_error.badRequest("No answers provided.");
     }
 
@@ -283,7 +287,9 @@ export const submit_ans = async (pollId, user, answer, visitorId) => {
 
     for (const qId of questions) {
       if (!pollQuestionIdSet.has(qId)) {
-        throw Api_error.badrequest("One or more questions do not belong to this poll.");
+        throw Api_error.badrequest(
+          "One or more questions do not belong to this poll.",
+        );
       }
     }
 
@@ -298,13 +304,15 @@ export const submit_ans = async (pollId, user, answer, visitorId) => {
       .where(inArray(optionTable.id, optionIds));
 
     const optionQuestionMap = new Map(
-      validOptions.map((opt) => [opt.id, opt.questionId])
+      validOptions.map((opt) => [opt.id, opt.questionId]),
     );
 
     for (const ans of answer.answers) {
       const associatedQuestionId = optionQuestionMap.get(ans.optionId);
       if (!associatedQuestionId || associatedQuestionId !== ans.questionId) {
-        throw Api_error.badRequest("One or more options do not belong to the specified question.");
+        throw Api_error.badrequest(
+          "One or more options do not belong to the specified question.",
+        );
       }
     }
 
@@ -312,37 +320,36 @@ export const submit_ans = async (pollId, user, answer, visitorId) => {
     const condition = submittedBy.verifiedUser
       ? and(
           eq(answerTable.verifiedUser, submittedBy.verifiedUser),
-          inArray(answerTable.questionId,questions),
+          inArray(answerTable.questionId, questions),
         )
       : and(
           eq(answerTable.anonymousUser, submittedBy.anonymousUser),
-          inArray(answerTable.questionId,questions),
+          inArray(answerTable.questionId, questions),
         );
 
     const existingAnswer = await tx
-      .select()
+      .select({ id: answerTable.id })
       .from(answerTable)
       .where(condition)
       .limit(1);
 
     if (existingAnswer.length > 0) {
       throw Api_error.badrequest(
-        "You have already submitted answers for this poll."
+        "You have already submitted answers for this poll.",
       );
     }
-
     const values = answer.answers.map((ans) => ({
       verifiedUser: submittedBy.verifiedUser,
       anonymousUser: submittedBy.anonymousUser,
+      pollId: poll.id,
       questionId: ans.questionId,
       answer: ans.optionId,
     }));
-
     const inserted = await tx
       .insert(answerTable)
       .values(values)
       .returning({ id: answerTable.id });
-
+  
     if (!inserted || inserted.length !== answer.answers.length) {
       throw Api_error.badRequest("Answer submission failed.");
     }
@@ -351,6 +358,114 @@ export const submit_ans = async (pollId, user, answer, visitorId) => {
 };
 
 //dashboard
-export const dashboard=async()=>{
-  
-}
+export const dashboard = async (userId) => {
+  //total polls
+  const polls = await db
+    .select()
+    .from(pollTable)
+    .where(eq(pollTable.creatorId, userId));
+
+  if (!polls || polls.length === 0) {
+    return {
+      success: true,
+      totalPolls: 0,
+      activePolls: 0,
+      publishedPolls: 0,
+      totalVoters: 0,
+      topPerformingPolls: [],
+    };
+  }
+
+  //active polls
+  const now = new Date();
+  const activePoll = polls.filter(
+    (poll) => poll.startsAt <= now && poll.expiresAt >= now,
+  );
+
+  //published polls
+  const publishedPoll = polls.filter((p) => p.isPublished);
+
+  //total voters and per-poll unique voters
+  const pollIds = polls.map((poll) => poll.id);
+  const pollVoters = await db
+    .select()
+    .from(answerTable)
+    .where(inArray(answerTable.pollId, pollIds));
+
+  const pollVotersMap = new Map();
+  const totalVotersSet = new Set();
+
+  for (const ans of pollVoters) {
+    const voterId = ans.verifiedUser || ans.anonymousUser;
+    if (!voterId) continue;
+
+    totalVotersSet.add(voterId);
+
+    if (!pollVotersMap.has(ans.pollId)) {
+      pollVotersMap.set(ans.pollId, new Set());
+    }
+    pollVotersMap.get(ans.pollId).add(voterId);
+  }
+
+  //top performing polls (top 3 by unique voters)
+  const topPerformingPolls = polls
+    .map((poll) => ({
+      pollId: poll.id,
+      title: poll.title,
+      totalUniqueVoters: pollVotersMap.has(poll.id)
+        ? pollVotersMap.get(poll.id).size
+        : 0,
+    }))
+    .sort((a, b) => b.totalUniqueVoters - a.totalUniqueVoters)
+    .slice(0, 3);
+
+  return {
+    success: true,
+    totalPolls: polls.length,
+    activePolls: activePoll.length,
+    publishedPolls: publishedPoll.length,
+    totalVoters: totalVotersSet.size,
+    topPerformingPolls,
+  };
+};
+
+
+//search polls
+export const search = async (userId, queryParams = {}) => {
+  const { title, search, q, status, isPublished } = queryParams;
+  const searchTerm = title || search || q;
+
+  const conditions = [eq(pollTable.creatorId, userId)];
+
+  if (searchTerm && typeof searchTerm === "string" && searchTerm.trim() !== "") {
+    conditions.push(ilike(pollTable.title, `%${searchTerm.trim()}%`));
+  }
+
+  const now = new Date();
+
+  if (status && typeof status === "string") {
+    const statusLower = status.toLowerCase().trim();
+    if (statusLower === "active") {
+      conditions.push(lte(pollTable.startsAt, now));
+      conditions.push(gte(pollTable.expiresAt, now));
+    } else if (statusLower === "expire" || statusLower === "expired") {
+      conditions.push(lt(pollTable.expiresAt, now));
+    } else if (statusLower === "published") {
+      conditions.push(eq(pollTable.isPublished, true));
+    } else if (statusLower === "draft" || statusLower === "unpublished") {
+      conditions.push(eq(pollTable.isPublished, false));
+    }
+  }
+
+  if (isPublished !== undefined) {
+    const isPub = isPublished === "true" || isPublished === true;
+    conditions.push(eq(pollTable.isPublished, isPub));
+  }
+
+  const polls = await db
+    .select()
+    .from(pollTable)
+    .where(and(...conditions));
+
+  return polls;
+};

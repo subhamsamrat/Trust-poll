@@ -1,0 +1,2 @@
+ALTER TABLE "answerTable" ADD COLUMN "poll_id" uuid NOT NULL;--> statement-breakpoint
+ALTER TABLE "answerTable" ADD CONSTRAINT "answerTable_poll_id_polls_id_fk" FOREIGN KEY ("poll_id") REFERENCES "public"."polls"("id") ON DELETE no action ON UPDATE no action;
