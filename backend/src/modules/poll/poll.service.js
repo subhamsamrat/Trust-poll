@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import { db } from "../../common/config/db.js";
 import { pollTable } from "../../common/config/models/poll.schema.js";
 import { questionTable } from "../../common/config/models/question.schema.js";
@@ -9,9 +8,8 @@ import Api_error from "../../common/utils/Api_error.js";
 import { Generate_visitorId } from "../../common/utils/jwt.js";
 import { usersTable } from "../../common/config/models/auth.schema.js";
 import { answerTable } from "../../common/config/models/answer.schema.js";
+import { getIO } from "../../socket/socket.js";
 
-const hashToken = (token) =>
-  crypto.createHash("sha256").update(token).digest("hex");
 
 //create poll
 export const create_poll = async ({ body, created_by }) => {
@@ -85,18 +83,33 @@ export const update_poll = async (pollId, user, body) => {
   if (isExist.creatorId !== user.id) {
     throw Api_error.unauthorized("You are not authorized to update this poll");
   }
+  const newIsPublished = body.isPublished !== undefined ? Boolean(body.isPublished) : isExist.isPublished;
+
   const [updatedPoll] = await db
     .update(pollTable)
     .set({
-      isPublished: body.isPublished ? body.isPublished : isExist.isPublished,
+      isPublished: newIsPublished,
     })
     .where(eq(pollTable.id, isExist.id))
-    .returning({ id: pollTable.id });
+    .returning({ id: pollTable.id, isPublished: pollTable.isPublished });
+
   if (updatedPoll.id) {
-    return { success: true, pollId: updatedPoll.id };
+    // Broadcast updated results over socket.io
+    await broadcast_poll_results(pollId);
+    if (newIsPublished) {
+      try {
+        const results = await get_poll_results(pollId, user);
+        getIO().to(`poll:${pollId}`).emit("results_published", results);
+        console.log(`[Socket.io] Broadcasted results_published for poll ${pollId}`);
+      } catch (err) {
+        console.log("Socket emit error on poll update:", err.message);
+      }
+    }
+    return { success: true, pollId: updatedPoll.id, isPublished: updatedPoll.isPublished };
   }
   return { success: false };
 };
+
 
 //visit
 export const visit_poll = async (pollId, user) => {
@@ -353,9 +366,13 @@ export const submit_ans = async (pollId, user, answer, visitorId) => {
     if (!inserted || inserted.length !== answer.answers.length) {
       throw Api_error.badRequest("Answer submission failed.");
     }
+
+    // Broadcast socket event after successful submission
+    await broadcast_poll_results(pollId);
   });
   return { success: true };
 };
+
 
 //dashboard
 export const dashboard = async (userId) => {
@@ -469,3 +486,138 @@ export const search = async (userId, queryParams = {}) => {
 
   return polls;
 };
+
+//get poll results
+export const get_poll_results = async (pollId, reqUser = null) => {
+  
+  const [poll] = await db
+    .select()
+    .from(pollTable)
+    .where(eq(pollTable.id, pollId));
+
+  if (!poll) {
+    throw Api_error.notFound("Poll not found");
+  }
+
+  const isCreator = reqUser && poll.creatorId === reqUser.id;
+
+  const questions = await db
+    .select()
+    .from(questionTable)
+    .where(eq(questionTable.pollId, pollId));
+
+  if (!questions || questions.length === 0) {
+    throw Api_error.notFound("No questions found for this poll");
+  }
+
+  const questionIds = questions.map((q) => q.id);
+
+  const options = await db
+    .select()
+    .from(optionTable)
+    .where(inArray(optionTable.questionId, questionIds));
+
+  const answers = await db
+    .select()
+    .from(answerTable)
+    .where(eq(answerTable.pollId, pollId));
+
+  const uniqueVotersSet = new Set();
+  answers.forEach((ans) => {
+    const voterId = ans.verifiedUser || ans.anonymousUser;
+    if (voterId) uniqueVotersSet.add(voterId);
+  });
+  const totalVoters = uniqueVotersSet.size;
+
+  const optionVoteCounts = new Map();
+  answers.forEach((ans) => {
+    const count = optionVoteCounts.get(ans.answer) || 0;
+    optionVoteCounts.set(ans.answer, count + 1);
+  });
+
+  const questionVoteCounts = new Map();
+  answers.forEach((ans) => {
+    const count = questionVoteCounts.get(ans.questionId) || 0;
+    questionVoteCounts.set(ans.questionId, count + 1);
+  });
+
+  const formattedQuestions = questions.map((q) => {
+    const qOptions = options.filter((o) => o.questionId === q.id);
+    const qTotalVotes = questionVoteCounts.get(q.id) || 0;
+
+    const formattedOptions = qOptions.map((o) => {
+      const voteCount = optionVoteCounts.get(o.id) || 0;
+      const percentage =
+        qTotalVotes > 0
+          ? parseFloat(((voteCount / qTotalVotes) * 100).toFixed(1))
+          : 0;
+
+      return {
+        optionId: o.id,
+        option: o.option,
+        voteCount: isCreator || poll.isPublished ? voteCount : null,
+        percentage: isCreator || poll.isPublished ? percentage : null,
+      };
+    });
+
+    return {
+      questionId: q.id,
+      question: q.question,
+      totalVotes: isCreator || poll.isPublished ? qTotalVotes : null,
+      options: formattedOptions,
+    };
+  });
+
+  return {
+    pollId: poll.id,
+    title: poll.title,
+    isPublished: poll.isPublished,
+    canViewResults: isCreator || poll.isPublished,
+    message:
+      isCreator || poll.isPublished
+        ? "Results fetched successfully"
+        : "Results are not published yet by the host",
+    totalVoters: isCreator || poll.isPublished ? totalVoters : null,
+    questions: formattedQuestions,
+  };
+};
+
+// Broadcast poll results in real time over WebSockets
+export const broadcast_poll_results = async (pollId) => {
+  try {
+    let io;
+    try {
+      io = getIO();
+    } catch {
+      return; // Socket.io not initialized
+    }
+    if (!io) return;
+
+    // Fetch public poll results
+    const publicResults = await get_poll_results(pollId, null);
+
+    // Emit live update to general room
+    io.to(`poll:${pollId}`).emit("poll_results_update", publicResults);
+    io.to(`poll:${pollId}`).emit("live_results_update", publicResults);
+    io.to(`poll:${pollId}`).emit("vote_count_update", {
+      pollId,
+      totalVoters: publicResults.totalVoters,
+    });
+
+    // Fetch creator poll results for creator room
+    const [poll] = await db
+      .select({ creatorId: pollTable.creatorId })
+      .from(pollTable)
+      .where(eq(pollTable.id, pollId));
+
+    if (poll?.creatorId) {
+      const creatorResults = await get_poll_results(pollId, { id: poll.creatorId });
+      io.to(`poll:${pollId}:creator`).emit("poll_results_update", creatorResults);
+      io.to(`poll:${pollId}:creator`).emit("creator_results_update", creatorResults);
+      io.to(`poll:${pollId}:creator`).emit("live_results_update", creatorResults);
+    }
+  } catch (err) {
+    console.log(`[Socket.io] Error broadcasting poll results for ${pollId}:`, err.message);
+  }
+};
+

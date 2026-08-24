@@ -152,3 +152,18 @@ export const search = async (req, res, next) => {
     next(error);
   }
 };
+
+//get poll results
+export const get_poll_results = async (req, res, next) => {
+  try {
+    if (req?.params?.pollId) {
+      const results = await PollService.get_poll_results(req.params.pollId, req.user);
+      Api_response.ok(res, "Poll results retrieved successfully", results);
+    } else {
+      throw Api_error.notFound("Required parameter pollId is missing");
+    }
+  } catch (error) {
+    console.log("error in getting poll results", error);
+    return next(error);
+  }
+};

@@ -16,6 +16,8 @@ poll_router.get("/all-polls",accessVerifyMiddleware,Poll_controller.get_all_poll
 poll_router.get("/dashboard",accessVerifyMiddleware,Poll_controller.Dashboard);
 poll_router.get("/search",accessVerifyMiddleware,Poll_controller.search);
 poll_router.get("/detail/:pollId",optionalAuthMiddleware,Poll_controller.get_poll_detail);
+poll_router.get("/results/:pollId",optionalAuthMiddleware,Poll_controller.get_poll_results);
+
 
 
 poll_router.post("/visit/:pollId",optionalAuthMiddleware,Poll_controller.visit_poll);  

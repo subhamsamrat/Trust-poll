@@ -15,7 +15,6 @@ const optionalAuthMiddleware=(req,res,next)=>{
     const decodedToken = verifyAccessToken(token);
   
     req.user=decodedToken;
-    console.log("req.user",req.user);
     
     next()
 }
