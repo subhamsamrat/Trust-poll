@@ -9,6 +9,13 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Welcome to Trust Poll'
+  });
+});
+
 app.use('/api/auth', auth_router); 
 app.use('/api/poll',poll_router);
 //app.use('/api/poll/answer',);
