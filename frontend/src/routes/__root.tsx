@@ -1,8 +1,9 @@
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
+// import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
+// import { TanStackDevtools } from '@tanstack/react-devtools'
 import Footer from '../components/Footer'
 import Header from '../components/Header'
+import { ThemeProvider } from '../lib/ThemeContext'
 
 import appCss from '../styles.css?url'
 
@@ -19,7 +20,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'TanStack Start Starter',
+        title: 'TrustPoll',
       },
     ],
     links: [
@@ -39,21 +40,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
       </head>
-      <body className="font-sans antialiased [overflow-wrap:anywhere] ">
-        <Header />
-        {children}
-        <Footer />
-        {/* <TanStackDevtools
-          config={{
-            position: 'bottom-right',
-          }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        /> */}
+      <body className="font-sans antialiased [overflow-wrap:anywhere] bg-[#F5F5F5] text-slate-900 dark:bg-[#000000] dark:text-white min-h-screen flex flex-col transition-colors duration-200">
+        <ThemeProvider>
+         <Header/>
+          <main className="flex-1">{children}</main>
+          <Footer/>
+        </ThemeProvider>
         <Scripts />
       </body>
     </html>

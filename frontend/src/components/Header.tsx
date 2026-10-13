@@ -1,39 +1,78 @@
+import { useState, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import ThemeToggle from './ThemeToggle'
+import logoDark from '../assets/logo_dark.svg'
+import logoLight from '../assets/logo_light.svg'
+import { useTheme } from '../lib/ThemeContext'
 
 export default function Header() {
-  return (
-    <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--header-bg)] px-4 backdrop-blur-lg">
-      <nav className="page-wrap flex flex-wrap items-center gap-x-3 gap-y-2 py-3 sm:py-4">
-        <h2 className="m-0 flex-shrink-0 text-base font-semibold tracking-tight">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-3 py-1.5 text-sm text-[var(--sea-ink)] no-underline shadow-[0_8px_24px_rgba(30,90,72,0.08)] sm:px-4 sm:py-2"
-          >
-            <span className="h-2 w-2 rounded-full bg-[linear-gradient(90deg,#56c6be,#7ed3bf)]" />
-            TrustPoll
-          </Link>
-        </h2>
+  const { resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
 
-        <div className="order-3 flex w-full flex-wrap items-center gap-x-4 gap-y-1 pb-1 text-sm font-semibold sm:order-none sm:w-auto sm:flex-nowrap sm:pb-0">
+  useEffect(() => {
+    setMounted(true)
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20)
+    }
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const logo = mounted && resolvedTheme === 'dark' ? logoDark : logoLight
+
+  return (
+    <header className="sticky top-0 z-50 w-full transition-all duration-300 ease-in-out px-3 sm:px-6 py-2.5 sm:py-3">
+      <nav
+        aria-label="Main Navigation"
+        className={`mx-auto flex items-center justify-between transition-all duration-300 ease-in-out ${
+          scrolled
+            ? 'max-w-5xl rounded-full bg-white/80 dark:bg-[#111111]/80 px-4 sm:px-6 py-2 backdrop-blur-md border border-neutral-200/70 dark:border-neutral-800/80 shadow-[0_0_24px_rgba(34,42,53,0.06),0_1px_1px_rgba(0,0,0,0.05),0_0_0_1px_rgba(34,42,53,0.04),0_0_4px_rgba(34,42,53,0.08),0_16px_68px_rgba(47,48,55,0.05),0_1px_0_rgba(255,255,255,0.1)_inset]'
+            : 'max-w-7xl rounded-2xl bg-transparent px-4 sm:px-6 py-3 border border-transparent'
+        }`}
+      >
+        {/* Left: Brand Logo (Preserved exact logo icon) */}
+        <div className="flex items-center gap-2">
           <Link
             to="/"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
+            className="inline-flex items-center gap-2 no-underline transition-opacity hover:opacity-90"
+            aria-label="TrustPoll Home"
           >
-            Home
-          </Link>
-          <Link
-            to="/about"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            About
+            <img src={logo} alt="TrustPoll Logo" className="h-7 sm:h-8 w-auto object-contain" />
           </Link>
         </div>
 
-        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+        {/* Right: Actions (MasterJi StarBorder Login Button & Theme Toggle) */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          {/* MasterJi-style StarBorder Animated Login Button */}
+          <Link
+            to="/login"
+            className="group relative inline-block overflow-hidden rounded-full p-[1.5px] transition-transform duration-200 active:scale-95 shadow-sm hover:shadow-[0_0_20px_rgba(255,143,0,0.35)]"
+          >
+            {/* Animated glowing star borders */}
+            <div
+              className="animate-star-movement-bottom absolute bottom-[-11px] right-[-250%] z-0 h-[50%] w-[300%] rounded-full opacity-80"
+              style={{
+                background: 'radial-gradient(circle, #FF8F00, transparent 15%)',
+                animationDuration: '5s',
+              }}
+            />
+            <div
+              className="animate-star-movement-top absolute left-[-250%] top-[-10px] z-0 h-[50%] w-[300%] rounded-full opacity-80"
+              style={{
+                background: 'radial-gradient(circle, #FF8F00, transparent 15%)',
+                animationDuration: '5s',
+              }}
+            />
 
+            {/* Button Inner Background & Typography */}
+            <div className="relative z-10 flex items-center justify-center rounded-full border border-neutral-300/60 dark:border-neutral-800 bg-gradient-to-b from-neutral-800 to-black dark:from-neutral-900 dark:to-neutral-950 px-4 sm:px-5 py-1.5 text-center text-xs sm:text-sm font-semibold text-white transition-all duration-200 group-hover:brightness-110">
+              Login
+            </div>
+          </Link>
+
+          {/* Preserved ThemeToggle Icon */}
           <ThemeToggle />
         </div>
       </nav>
