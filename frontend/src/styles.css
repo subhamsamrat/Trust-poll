@@ -42,3 +42,19 @@
 .animate-star-movement-top {
   animation: star-movement-top 5s linear infinite;
 }
+
+/* Hide scrollbars globally across the entire project while preserving scrolling */
+html,
+body,
+* {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+*::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, and Opera */
+  width: 0;
+  height: 0;
+}

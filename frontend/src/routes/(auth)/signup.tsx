@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import logo from '../../assets/logo.svg'
 import { useForm, type SubmitHandler } from 'react-hook-form'
 import { Icon } from '@iconify/react'
+import { X } from 'lucide-react'
 
 type SignupFormInputs = {
   email: string
@@ -22,13 +24,40 @@ function RouteComponent() {
 
   const navigate = useNavigate()
 
+  const handleClose = () => {
+    if (window.history.length > 1) {
+      window.history.back()
+    } else {
+      navigate({ to: '/' })
+    }
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   const onSubmit: SubmitHandler<SignupFormInputs> = (data) => {
     console.log('Signup Form Data:', data)
   }
 
   return (
     <div className="min-h-[calc(100vh-160px)] flex items-center justify-center px-4 py-12">
-      <div className="w-full sm:max-w-[420px] p-6 sm:p-8 bg-white dark:bg-[#1a1a1a] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl transition-all">
+      <div className="relative w-full sm:max-w-[420px] p-6 sm:p-8 bg-white dark:bg-[#1a1a1a] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl transition-all">
+        {/* Close Button */}
+        <button
+          type="button"
+          onClick={handleClose}
+          className="absolute top-5 right-5 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-500 dark:text-zinc-400 transition cursor-pointer"
+          aria-label="Close"
+        >
+          <X size={18} />
+        </button>
         <div className="flex flex-col items-center gap-2 text-center pb-6">
           <img src={logo} alt="TrustPoll Logo" className="h-8 w-auto" />
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">

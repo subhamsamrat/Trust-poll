@@ -10,7 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AboutRouteImport } from './routes/about'
+import { Route as AnswerPollRouteImport } from './routes/answerPoll'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as authLoginRouteImport } from './routes/(auth)/login'
 import { Route as authSignupRouteImport } from './routes/(auth)/signup'
@@ -20,9 +20,9 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
+const AnswerPollRoute = AnswerPollRouteImport.update({
+  id: '/answerPoll',
+  path: '/answerPoll',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -43,14 +43,14 @@ const authSignupRoute = authSignupRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
+  '/answerPoll': typeof AnswerPollRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof authLoginRoute
   '/signup': typeof authSignupRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
+  '/answerPoll': typeof AnswerPollRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof authLoginRoute
   '/signup': typeof authSignupRoute
@@ -58,20 +58,20 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
+  '/answerPoll': typeof AnswerPollRoute
   '/dashboard': typeof DashboardRoute
   '/(auth)/login': typeof authLoginRoute
   '/(auth)/signup': typeof authSignupRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/dashboard' | '/login' | '/signup'
+  fullPaths: '/' | '/answerPoll' | '/dashboard' | '/login' | '/signup'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/dashboard' | '/login' | '/signup'
+  to: '/' | '/answerPoll' | '/dashboard' | '/login' | '/signup'
   id:
     | '__root__'
     | '/'
-    | '/about'
+    | '/answerPoll'
     | '/dashboard'
     | '/(auth)/login'
     | '/(auth)/signup'
@@ -79,7 +79,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AboutRoute: typeof AboutRoute
+  AnswerPollRoute: typeof AnswerPollRoute
   DashboardRoute: typeof DashboardRoute
   authLoginRoute: typeof authLoginRoute
   authSignupRoute: typeof authSignupRoute
@@ -94,11 +94,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
+    '/answerPoll': {
+      id: '/answerPoll'
+      path: '/answerPoll'
+      fullPath: '/answerPoll'
+      preLoaderRoute: typeof AnswerPollRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -127,7 +127,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AboutRoute: AboutRoute,
+  AnswerPollRoute: AnswerPollRoute,
   DashboardRoute: DashboardRoute,
   authLoginRoute: authLoginRoute,
   authSignupRoute: authSignupRoute,

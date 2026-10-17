@@ -13,12 +13,16 @@ export const Route = createFileRoute('/dashboard')({
 })
 
 import Lastsection from "#/components/dashboard/lastsection.tsx"
-
+import {useCurrentUser} from "#/lib/currentUser.ts"
 
 
 
 function RouteComponent() {
- 
+ const {
+ data:user
+}=useCurrentUser()
+console.log(user);
+
 
   return (
     <div>
