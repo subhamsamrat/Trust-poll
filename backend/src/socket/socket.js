@@ -1,5 +1,5 @@
 import { Server } from "socket.io";
-import { setupPollSocketHandlers } from "./poll.socket.js";
+import { emitDashboardUpdate, setupPollSocketHandlers } from "./poll.socket.js";
 
 let io = null;
 
@@ -17,6 +17,7 @@ export const initSocket = (httpServer) => {
 
     // Register poll handlers
     setupPollSocketHandlers(io, socket);
+    emitDashboardUpdate(io, socket);
 
     socket.on("disconnect", () => {
       console.log(`[Socket.io] Client disconnected: ${socket.id}`);
@@ -32,3 +33,4 @@ export const getIO = () => {
   }
   return io;
 };
+

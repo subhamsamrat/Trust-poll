@@ -5,8 +5,9 @@ import ThemeToggle from './ThemeToggle'
 import logoDark from '../assets/logo_dark.svg'
 import logoLight from '../assets/logo_light.svg'
 import { useTheme } from '../lib/ThemeContext'
-import { useCurrentUser } from '../lib/currentUser'
+import { useCurrentUser, clearStoredUser } from '../lib/currentUser'
 import { useQueryClient } from '@tanstack/react-query'
+import { logoutApi } from '../api/auth.api'
 
 export default function Header() {
   const { resolvedTheme } = useTheme()
@@ -32,7 +33,13 @@ export default function Header() {
     setMenuOpen(false)
   }, [location.pathname])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await logoutApi()
+    } catch (e) {
+      // Ignore if session already expired on server
+    }
+    clearStoredUser()
     queryClient.setQueryData(['currentUser'], null)
     queryClient.removeQueries({ queryKey: ['currentUser'] })
     setMenuOpen(false)
@@ -103,7 +110,7 @@ export default function Header() {
               )}
             </div>
           ) : (
-            /* Logged out: MasterJi StarBorder Login Button */
+            /* Logged out */
             <Link
               to="/login"
               className="group relative inline-block overflow-hidden rounded-full p-[1.5px] transition-transform duration-200 active:scale-95 shadow-sm hover:shadow-[0_0_20px_rgba(255,143,0,0.35)]"

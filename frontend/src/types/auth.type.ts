@@ -8,3 +8,9 @@ export  type RegisterInput = {
     email: string,
     password: string,
 };
+
+export type SignupFormInputs = {
+  email: string
+  password: string
+  FullName: string
+}

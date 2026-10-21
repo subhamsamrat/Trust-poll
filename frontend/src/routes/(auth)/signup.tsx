@@ -4,12 +4,9 @@ import logo from '../../assets/logo.svg'
 import { useForm, type SubmitHandler } from 'react-hook-form'
 import { Icon } from '@iconify/react'
 import { X } from 'lucide-react'
+import type { SignupFormInputs } from '../../types/auth.type'
+import { useSignupUser } from '#/hooks/auth.hook'
 
-type SignupFormInputs = {
-  email: string
-  password: string
-  FullName: string
-}
 
 export const Route = createFileRoute('/(auth)/signup')({
   component: RouteComponent,
@@ -42,8 +39,10 @@ function RouteComponent() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+ const signupApi=useSignupUser();
+
   const onSubmit: SubmitHandler<SignupFormInputs> = (data) => {
-    console.log('Signup Form Data:', data)
+    signupApi.mutate(data)
   }
 
   return (

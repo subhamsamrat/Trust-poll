@@ -4,7 +4,6 @@ import {
   FileText,
   Plus,
   ShieldCheck,
-  Vote,
   Share2,
   Copy,
   Check,
@@ -18,18 +17,7 @@ import { QRCodeSVG } from "qrcode.react"
 import { IoIosSearch } from "react-icons/io"
 import CreatePoll from "#/components/polls/createPoll"
 import ViewPoll, { type PollDetail } from "#/components/polls/viewPoll"
-
-// ─── Types ─────────────────────────────────────────────────────────────────────
-
-interface PollItem {
-  id: string
-  title: string
-  status: 'active' | 'scheduled' | 'closed'
-  responseMode: 'verified' | 'anonymous'
-  totalVotes: number
-  createdAt: string
-  expiresAt: string
-}
+import type { PollItem, ShareModalProps } from "#/types/dashboard.type"
 
 // ─── Mock list data (shown in table / cards) ───────────────────────────────────
 
@@ -288,11 +276,7 @@ const mockPollDetails: Record<string, PollDetail> = {
 
 // ─── Share Modal Component ──────────────────────────────────────────────────
 
-interface ShareModalProps {
-  poll: PollItem | null
-  isOpen: boolean
-  onClose: () => void
-}
+
 
 function ShareModal({ poll, isOpen, onClose }: ShareModalProps) {
   const [copied, setCopied] = useState(false)
@@ -756,10 +740,6 @@ const Lastsection = () => {
                   {/* Metadata & Action */}
                   <div className="pt-2 border-t border-slate-200/80 dark:border-zinc-800 flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
                     <div className="flex items-center gap-3">
-                      <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-zinc-300">
-                        <Vote size={14} className="text-blue-500" />
-                        {poll.totalVotes}
-                      </span>
                       <span className="flex items-center gap-1 text-[11px]">
                         <Calendar size={13} />
                         {poll.createdAt}

@@ -1,9 +1,21 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Vote, BarChart3, ShieldCheck, ArrowRight } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
+import { useCurrentUser } from '#/lib/currentUser'
 
 export const Route = createFileRoute('/')({ component: App })
 
+
 function App() {
+const {data:user}=useCurrentUser();
+  const navigate=useNavigate();
+  function handleNavigate() {
+    if (!user) {
+      navigate({ to: '/login' })
+    } else {
+      navigate({ to: '/dashboard' })
+    }
+  }
   return (
     <div className="flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
       {/* Hero Section */}
@@ -22,13 +34,13 @@ function App() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-          <Link
-            to="/dashboard"
+          <div
+            onClick={handleNavigate}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md transition-all duration-200 hover:-translate-y-0.5"
           >
             <span>Explore Dashboard</span>
             <ArrowRight size={16} />
-          </Link>
+          </div>
           <Link
             to="/login"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#FF8F00] hover:bg-amber-600 text-black font-semibold text-sm shadow-md transition-all duration-200 hover:-translate-y-0.5"

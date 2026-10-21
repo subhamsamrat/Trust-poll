@@ -14,7 +14,7 @@ async function main() {
       console.log(`Server running on: http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.log('Fail to start Server', error);
+    console.log('Fail to start Server:', error);
   }
 }
 main();

@@ -4,9 +4,10 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import Footer from '../components/Footer'
 import Header from '../components/Header'
 import { ThemeProvider } from '../lib/ThemeContext'
-import {QueryClient, QueryClientProvider} from '@tanstack/react-query' 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query' 
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { Toast } from "@heroui/react";
+import { SocketProvider } from '../socket/socketProvider'
 
 import appCss from '../styles.css?url'
 
@@ -49,6 +50,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body className="font-sans antialiased [overflow-wrap:anywhere] bg-[#F5F5F5] text-slate-900
        dark:bg-[#000000] dark:text-white min-h-screen flex flex-col transition-colors duration-200">
+        <SocketProvider>
         <QueryClientProvider client={queryClient}>
         <ThemeProvider>
          <Header/>
@@ -58,6 +60,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             <Toast.Provider placement="top" />
         </ThemeProvider>
         </QueryClientProvider>
+        </SocketProvider>
         <Scripts />
       </body>
     </html>

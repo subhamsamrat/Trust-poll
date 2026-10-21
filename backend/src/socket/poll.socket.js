@@ -1,18 +1,20 @@
-import { get_poll_results } from "../modules/poll/poll.service.js";
+import { dashboardRoom } from "../common/utils/socket.helper.js";
+import { dashboard, get_poll_results } from "../modules/poll/poll.service.js";
 
 export const setupPollSocketHandlers = (io, socket) => {
   // Client joins a specific poll room to listen for live updates
   socket.on("join_poll", async ({ pollId, isCreator, user }) => {
     if (!pollId) return;
-    const room = `poll:${pollId}`;
-    socket.join(room);
-    console.log(`[Socket.io] Socket ${socket.id} joined room ${room}`);
 
     if (isCreator || user?.isCreator){
       const creatorRoom = `poll:${pollId}:creator`;
       socket.join(creatorRoom);
       console.log(`[Socket.io] Socket ${socket.id} joined creator room ${creatorRoom}`);
     }
+
+    const room = `poll:${pollId}`;
+    socket.join(room);
+    console.log(`[Socket.io] Socket ${socket.id} joined room ${room} pollid: ${pollId} isCreator: ${isCreator} user: ${user?.id}`);
 
     socket.emit("joined_poll", { pollId, success: true });
   });
@@ -54,3 +56,18 @@ export const setupPollSocketHandlers = (io, socket) => {
   });
 };
 
+export const emitDashboardUpdate=(io,socket)=>{
+  try {
+    socket.on("dashboard",async({userId})=>{
+  if(!userId) return
+
+    //const dashboardRoom=`Dashboard:${userId}`
+     socket.join(dashboardRoom(userId))    
+    const response=await dashboard(userId)
+    socket.emit('dashboard',response);
+    })
+  
+  } catch (error) {
+    
+  }
+}

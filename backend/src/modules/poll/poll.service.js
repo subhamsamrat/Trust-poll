@@ -9,11 +9,13 @@ import { Generate_visitorId } from "../../common/utils/jwt.js";
 import { usersTable } from "../../common/config/models/auth.schema.js";
 import { answerTable } from "../../common/config/models/answer.schema.js";
 import { getIO } from "../../socket/socket.js";
+import { dashboardRoom } from "../../common/utils/socket.helper.js";
 
 
 //create poll
 export const create_poll = async ({ body, created_by }) => {
-  return await db.transaction(async (tx) => {
+  const io = getIO();
+  const newPoll = await db.transaction(async (tx) => {
     const [poll] = await tx
       .insert(pollTable)
       .values({
@@ -50,10 +52,21 @@ export const create_poll = async ({ body, created_by }) => {
 
     return poll;
   });
+  try {
+    if (io && created_by) {
+      const updatedDashboardData = await dashboard(created_by);
+
+      io.to(dashboardRoom(created_by)).emit("dashboard", updatedDashboardData);
+    }
+  } catch (emitError) {
+    console.error("Failed to broadcast dashboard update:", emitError);
+  }
+  return newPoll;
 };
 
 //delete poll
 export const delete_poll = async (pollId) => {
+  const io=getIO();
   const [isExist] = await db
     .select()
     .from(pollTable)
@@ -66,7 +79,17 @@ export const delete_poll = async (pollId) => {
     .where(eq(pollTable.id, isExist.id))
     .returning({ id: pollTable.id });
   if (deletedPoll.id) {
-    return { success: true, pollId: deletedPoll.id };
+    //broadcast Live_Data
+     try {
+    if (io) {
+      const updatedDashboardData = await dashboard(isExist.creatorId);
+
+      io.to(dashboardRoom(isExist.creatorId)).emit("dashboard", updatedDashboardData);
+    }
+  } catch (emitError) {
+    console.error("Failed to broadcast dashboard update:", emitError);
+  }
+    return { success: true, pollId: deletedPoll.id }; 
   }
   return { success: false };
 };
@@ -83,7 +106,10 @@ export const update_poll = async (pollId, user, body) => {
   if (isExist.creatorId !== user.id) {
     throw Api_error.unauthorized("You are not authorized to update this poll");
   }
-  const newIsPublished = body.isPublished !== undefined ? Boolean(body.isPublished) : isExist.isPublished;
+  const newIsPublished =
+    body.isPublished !== undefined
+      ? Boolean(body.isPublished)
+      : isExist.isPublished;
 
   const [updatedPoll] = await db
     .update(pollTable)
@@ -100,16 +126,21 @@ export const update_poll = async (pollId, user, body) => {
       try {
         const results = await get_poll_results(pollId, user);
         getIO().to(`poll:${pollId}`).emit("results_published", results);
-        console.log(`[Socket.io] Broadcasted results_published for poll ${pollId}`);
+        console.log(
+          `[Socket.io] Broadcasted results_published for poll ${pollId}`,
+        );
       } catch (err) {
         console.log("Socket emit error on poll update:", err.message);
       }
     }
-    return { success: true, pollId: updatedPoll.id, isPublished: updatedPoll.isPublished };
+    return {
+      success: true,
+      pollId: updatedPoll.id,
+      isPublished: updatedPoll.isPublished,
+    };
   }
   return { success: false };
 };
-
 
 //visit
 export const visit_poll = async (pollId, user) => {
@@ -229,7 +260,7 @@ export const get_poll_detail = async (pollId, req) => {
   }
 
   if (poll.expiresAt < now) {
-    throw Api_error.badRequest("Poll has expired");
+    throw Api_error.badrequest("Poll has expired");
   }
 
   return { poll: poll, questions: await getQuestionsAndOptions(poll.id) }; //return poll and questions in required format
@@ -237,18 +268,24 @@ export const get_poll_detail = async (pollId, req) => {
 
 //submit answer
 export const submit_ans = async (pollId, user, answer, visitorId) => {
-  await db.transaction(async (tx) => {
+   const io = getIO();
+  const data= await db.transaction(async (tx) => {
     //check if user is verified or anonymous
     let submittedBy = { verifiedUser: null, anonymousUser: null };
     if (user?.id) {
       submittedBy.verifiedUser = user.id;
     } else if (visitorId && user === null) {
       const [isExist] = await tx
-        .select({ visitorId: visitorTable.visitorId }).from(visitorTable).where(and(
+        .select({ visitorId: visitorTable.visitorId })
+        .from(visitorTable)
+        .where(
+          and(
             eq(visitorTable.pollId, pollId),
-            eq(visitorTable.visitorId, visitorId)));
-      
-      if (!isExist){
+            eq(visitorTable.visitorId, visitorId),
+          ),
+        );
+
+      if (!isExist) {
         throw Api_error.unauthorized();
       }
       submittedBy.anonymousUser = visitorId;
@@ -362,17 +399,26 @@ export const submit_ans = async (pollId, user, answer, visitorId) => {
       .insert(answerTable)
       .values(values)
       .returning({ id: answerTable.id });
-  
+
     if (!inserted || inserted.length !== answer.answers.length) {
       throw Api_error.badRequest("Answer submission failed.");
     }
-
+    return {poll:poll?poll:null}
     // Broadcast socket event after successful submission
-    await broadcast_poll_results(pollId);
+    //await broadcast_poll_results(pollId);
   });
+  //broadcast total voter to dashboard
+   try {
+    if (io && data.poll?true:false) {
+      const updatedDashboardData = await dashboard(data.poll.creatorId);
+
+      io.to(dashboardRoom(data.poll.creatorId)).emit("dashboard", updatedDashboardData);
+    }
+  } catch (emitError) {
+    console.error("Failed to broadcast dashboard update:", emitError);
+  }
   return { success: true };
 };
-
 
 //dashboard
 export const dashboard = async (userId) => {
@@ -403,7 +449,8 @@ export const dashboard = async (userId) => {
   const publishedPoll = polls.filter((p) => p.isPublished);
 
   //total voters and per-poll unique voters
-  const pollIds = polls.map((poll) => poll.id);
+  const pollIds = polls.map((poll) => poll.id);//pollIds
+  
   const pollVoters = await db
     .select()
     .from(answerTable)
@@ -427,14 +474,43 @@ export const dashboard = async (userId) => {
   //top performing polls (top 3 by unique voters)
   const topPerformingPolls = polls
     .map((poll) => ({
-      pollId: poll.id,
+      id: poll.id,
       title: poll.title,
       totalUniqueVoters: pollVotersMap.has(poll.id)
         ? pollVotersMap.get(poll.id).size
         : 0,
     }))
     .sort((a, b) => b.totalUniqueVoters - a.totalUniqueVoters)
-    .slice(0, 3);
+    .slice(0, 5);
+
+  // Visitors per poll (for last 5 polls chart)
+  const pollVisitors = await db
+    .select()
+    .from(visitorTable)
+    .where(inArray(visitorTable.pollId, pollIds));
+
+  const pollVisitorsMap = new Map();
+  for (const v of pollVisitors) {
+    if (!pollVisitorsMap.has(v.pollId)) {
+      pollVisitorsMap.set(v.pollId, new Set());
+    }
+    pollVisitorsMap.get(v.pollId).add(v.visitorId);
+  }
+
+  // Last 5 polls (most recently created) with visitors and voters
+  const last5Polls = polls
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5)
+    .map((poll) => ({
+      id: poll.id,
+      title: poll.title,
+      visitors: pollVisitorsMap.has(poll.id)
+        ? pollVisitorsMap.get(poll.id).size
+        : 0,
+      voters: pollVotersMap.has(poll.id)
+        ? pollVotersMap.get(poll.id).size
+        : 0,
+    }));
 
   return {
     success: true,
@@ -443,9 +519,9 @@ export const dashboard = async (userId) => {
     publishedPolls: publishedPoll.length,
     totalVoters: totalVotersSet.size,
     topPerformingPolls,
+    last5Polls,
   };
 };
-
 
 //search polls
 export const search = async (userId, queryParams = {}) => {
@@ -454,7 +530,11 @@ export const search = async (userId, queryParams = {}) => {
 
   const conditions = [eq(pollTable.creatorId, userId)];
 
-  if (searchTerm && typeof searchTerm === "string" && searchTerm.trim() !== "") {
+  if (
+    searchTerm &&
+    typeof searchTerm === "string" &&
+    searchTerm.trim() !== ""
+  ) {
     conditions.push(ilike(pollTable.title, `%${searchTerm.trim()}%`));
   }
 
@@ -489,7 +569,6 @@ export const search = async (userId, queryParams = {}) => {
 
 //get poll results
 export const get_poll_results = async (pollId, reqUser = null) => {
-  
   const [poll] = await db
     .select()
     .from(pollTable)
@@ -611,13 +690,26 @@ export const broadcast_poll_results = async (pollId) => {
       .where(eq(pollTable.id, pollId));
 
     if (poll?.creatorId) {
-      const creatorResults = await get_poll_results(pollId, { id: poll.creatorId });
-      io.to(`poll:${pollId}:creator`).emit("poll_results_update", creatorResults);
-      io.to(`poll:${pollId}:creator`).emit("creator_results_update", creatorResults);
-      io.to(`poll:${pollId}:creator`).emit("live_results_update", creatorResults);
+      const creatorResults = await get_poll_results(pollId, {
+        id: poll.creatorId,
+      });
+      io.to(`poll:${pollId}:creator`).emit(
+        "poll_results_update",
+        creatorResults,
+      );
+      io.to(`poll:${pollId}:creator`).emit(
+        "creator_results_update",
+        creatorResults,
+      );
+      io.to(`poll:${pollId}:creator`).emit(
+        "live_results_update",
+        creatorResults,
+      );
     }
   } catch (err) {
-    console.log(`[Socket.io] Error broadcasting poll results for ${pollId}:`, err.message);
+    console.log(
+      `[Socket.io] Error broadcasting poll results for ${pollId}:`,
+      err.message,
+    );
   }
 };
-

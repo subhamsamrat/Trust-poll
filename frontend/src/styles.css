@@ -43,6 +43,28 @@
   animation: star-movement-top 5s linear infinite;
 }
 
+/* Remove focus outline & tap highlight on recharts (white border on click/tap) */
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-surface,
+.recharts-surface * {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  user-select: none;
+}
+
+svg:focus,
+svg *:focus,
+.recharts-wrapper:focus,
+.recharts-wrapper:focus-visible,
+.recharts-surface:focus,
+.recharts-surface:focus-visible {
+  outline: none !important;
+  border: none !important;
+}
+
 /* Hide scrollbars globally across the entire project while preserving scrolling */
 html,
 body,

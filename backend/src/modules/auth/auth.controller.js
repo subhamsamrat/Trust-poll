@@ -69,3 +69,15 @@ export const logout = async (req, res, next) => {
     next(error);
   }
 };
+
+// get current user
+export const getMe = async (req, res, next) => {
+  try {
+    const user = await authService.getMe(req.user.id);
+    Api_response.ok(res, "Current user fetched successfully", user);
+  } catch (error) {
+    console.log("Error in getMe:", error);
+    next(error);
+  }
+};
+
