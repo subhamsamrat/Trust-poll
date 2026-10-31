@@ -11,272 +11,18 @@ import {
   ChevronRight,
   X,
   ExternalLink,
+  Loader2,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { IoIosSearch } from "react-icons/io"
 import CreatePoll from "#/components/polls/createPoll"
 import ViewPoll, { type PollDetail } from "#/components/polls/viewPoll"
-import type { PollItem, ShareModalProps } from "#/types/dashboard.type"
-
-// ─── Mock list data (shown in table / cards) ───────────────────────────────────
-
-const mockPolls: PollItem[] = [
-  {
-    id: '1',
-    title: 'Favorite Programming Language in 2026',
-    status: 'active',
-    responseMode: 'verified',
-    totalVotes: 486,
-    createdAt: '2026-10-10',
-    expiresAt: '2026-10-24',
-  },
-  {
-    id: '2',
-    title: 'Best Frontend Framework for Enterprise Apps',
-    status: 'active',
-    responseMode: 'verified',
-    totalVotes: 421,
-    createdAt: '2026-10-09',
-    expiresAt: '2026-10-23',
-  },
-  {
-    id: '3',
-    title: 'Remote Work vs Hybrid vs On-site Survey',
-    status: 'active',
-    responseMode: 'anonymous',
-    totalVotes: 385,
-    createdAt: '2026-10-08',
-    expiresAt: '2026-10-22',
-  },
-  {
-    id: '4',
-    title: 'AI Coding Tools & Copilots Developer Adoption',
-    status: 'active',
-    responseMode: 'verified',
-    totalVotes: 332,
-    createdAt: '2026-10-07',
-    expiresAt: '2026-10-21',
-  },
-  {
-    id: '5',
-    title: 'React 19 vs Angular 19 Migration Plans',
-    status: 'active',
-    responseMode: 'verified',
-    totalVotes: 176,
-    createdAt: '2026-10-06',
-    expiresAt: '2026-10-20',
-  },
-  {
-    id: '6',
-    title: 'Decentralized Identity (DID) Acceptance Survey',
-    status: 'scheduled',
-    responseMode: 'anonymous',
-    totalVotes: 0,
-    createdAt: '2026-10-12',
-    expiresAt: '2026-10-26',
-  },
-  {
-    id: '7',
-    title: 'Community Governance Proposal #42',
-    status: 'closed',
-    responseMode: 'verified',
-    totalVotes: 612,
-    createdAt: '2026-09-25',
-    expiresAt: '2026-10-05',
-  },
-]
-
-// ─── Rich mock detail data (keyed by poll ID) ──────────────────────────────────
-// Replace this with a real API call: GET /polls/:id
-
-const mockPollDetails: Record<string, PollDetail> = {
-  '1': {
-    id: '1',
-    title: 'Favorite Programming Language in 2026',
-    status: 'active',
-    responseMode: 'verified',
-    isActive: true,
-    isPublished: true,
-    createdAt: '2026-10-10T09:00:00.000Z',
-    expiresAt: '2026-10-24T23:59:59.000Z',
-    creatorId: 'ec1eede4-43dd-4fc1-b9fc-0f8dc09dc0ea',
-    totalVisitors: 620,
-    totalVoters: 486,
-    questions: [
-      {
-        id: 'q1',
-        question: 'Which programming language do you use most in 2026?',
-        options: [
-          { id: 'o1', text: 'TypeScript', voteCount: 210 },
-          { id: 'o2', text: 'Python', voteCount: 145 },
-          { id: 'o3', text: 'Rust', voteCount: 80 },
-          { id: 'o4', text: 'Go', voteCount: 51 },
-        ],
-      },
-      {
-        id: 'q2',
-        question: 'What is your primary use case?',
-        options: [
-          { id: 'o5', text: 'Web Development', voteCount: 220 },
-          { id: 'o6', text: 'Data Science / AI', voteCount: 160 },
-          { id: 'o7', text: 'Systems / Embedded', voteCount: 106 },
-        ],
-      },
-    ],
-  },
-  '2': {
-    id: '2',
-    title: 'Best Frontend Framework for Enterprise Apps',
-    status: 'active',
-    responseMode: 'verified',
-    isActive: true,
-    isPublished: true,
-    createdAt: '2026-10-09T10:00:00.000Z',
-    expiresAt: '2026-10-23T23:59:59.000Z',
-    creatorId: 'ec1eede4-43dd-4fc1-b9fc-0f8dc09dc0ea',
-    totalVisitors: 540,
-    totalVoters: 421,
-    questions: [
-      {
-        id: 'q3',
-        question: 'Which frontend framework does your team use in production?',
-        options: [
-          { id: 'o8', text: 'React', voteCount: 200 },
-          { id: 'o9', text: 'Angular', voteCount: 120 },
-          { id: 'o10', text: 'Vue', voteCount: 60 },
-          { id: 'o11', text: 'Svelte', voteCount: 41 },
-        ],
-      },
-    ],
-  },
-  '3': {
-    id: '3',
-    title: 'Remote Work vs Hybrid vs On-site Survey',
-    status: 'active',
-    responseMode: 'anonymous',
-    isActive: true,
-    isPublished: true,
-    createdAt: '2026-10-08T08:00:00.000Z',
-    expiresAt: '2026-10-22T23:59:59.000Z',
-    creatorId: 'ec1eede4-43dd-4fc1-b9fc-0f8dc09dc0ea',
-    totalVisitors: 500,
-    totalVoters: 385,
-    questions: [
-      {
-        id: 'q4',
-        question: 'What work model do you prefer?',
-        options: [
-          { id: 'o12', text: 'Fully Remote', voteCount: 180 },
-          { id: 'o13', text: 'Hybrid', voteCount: 140 },
-          { id: 'o14', text: 'On-site', voteCount: 65 },
-        ],
-      },
-    ],
-  },
-  '4': {
-    id: '4',
-    title: 'AI Coding Tools & Copilots Developer Adoption',
-    status: 'active',
-    responseMode: 'verified',
-    isActive: true,
-    isPublished: true,
-    createdAt: '2026-10-07T11:00:00.000Z',
-    expiresAt: '2026-10-21T23:59:59.000Z',
-    creatorId: 'ec1eede4-43dd-4fc1-b9fc-0f8dc09dc0ea',
-    totalVisitors: 400,
-    totalVoters: 332,
-    questions: [
-      {
-        id: 'q5',
-        question: 'Which AI coding assistant do you use daily?',
-        options: [
-          { id: 'o15', text: 'GitHub Copilot', voteCount: 140 },
-          { id: 'o16', text: 'Cursor / Antigravity', voteCount: 110 },
-          { id: 'o17', text: 'Gemini Code Assist', voteCount: 52 },
-          { id: 'o18', text: 'None', voteCount: 30 },
-        ],
-      },
-    ],
-  },
-  '5': {
-    id: '5',
-    title: 'React 19 vs Angular 19 Migration Plans',
-    status: 'active',
-    responseMode: 'verified',
-    isActive: true,
-    isPublished: false,
-    createdAt: '2026-10-06T09:30:00.000Z',
-    expiresAt: '2026-10-20T23:59:59.000Z',
-    creatorId: 'ec1eede4-43dd-4fc1-b9fc-0f8dc09dc0ea',
-    totalVisitors: 210,
-    totalVoters: 176,
-    questions: [
-      {
-        id: 'q6',
-        question: 'Are you planning to migrate to React 19 this year?',
-        options: [
-          { id: 'o19', text: 'Yes, already started', voteCount: 80 },
-          { id: 'o20', text: 'Planning to', voteCount: 60 },
-          { id: 'o21', text: 'No, staying on older version', voteCount: 36 },
-        ],
-      },
-    ],
-  },
-  '6': {
-    id: '6',
-    title: 'Decentralized Identity (DID) Acceptance Survey',
-    status: 'scheduled',
-    responseMode: 'anonymous',
-    isActive: false,
-    isPublished: false,
-    createdAt: '2026-10-12T14:00:00.000Z',
-    startsAt: '2026-10-20T09:00:00.000Z',
-    expiresAt: '2026-10-26T23:59:59.000Z',
-    creatorId: 'ec1eede4-43dd-4fc1-b9fc-0f8dc09dc0ea',
-    totalVisitors: 0,
-    totalVoters: 0,
-    questions: [
-      {
-        id: 'q7',
-        question: 'Would you adopt decentralized identity in your next project?',
-        options: [
-          { id: 'o22', text: 'Definitely yes', voteCount: 0 },
-          { id: 'o23', text: 'Maybe, need to research', voteCount: 0 },
-          { id: 'o24', text: 'No', voteCount: 0 },
-        ],
-      },
-    ],
-  },
-  '7': {
-    id: '7',
-    title: 'Community Governance Proposal #42',
-    status: 'closed',
-    responseMode: 'verified',
-    isActive: false,
-    isPublished: true,
-    createdAt: '2026-09-25T08:00:00.000Z',
-    expiresAt: '2026-10-05T23:59:59.000Z',
-    creatorId: 'ec1eede4-43dd-4fc1-b9fc-0f8dc09dc0ea',
-    totalVisitors: 780,
-    totalVoters: 612,
-    questions: [
-      {
-        id: 'q8',
-        question: 'Do you approve Proposal #42?',
-        options: [
-          { id: 'o25', text: 'Approve', voteCount: 430 },
-          { id: 'o26', text: 'Reject', voteCount: 120 },
-          { id: 'o27', text: 'Abstain', voteCount: 62 },
-        ],
-      },
-    ],
-  },
-}
+import type { PollItem, ShareModalProps,Polls } from "#/types/dashboard.type"
+import { useCurrentUser } from "#/lib/currentUser"
+import { useAllPollsApi } from "#/hooks/auth.hook"
 
 // ─── Share Modal Component ──────────────────────────────────────────────────
-
-
 
 function ShareModal({ poll, isOpen, onClose }: ShareModalProps) {
   const [copied, setCopied] = useState(false)
@@ -448,12 +194,73 @@ function ShareModal({ poll, isOpen, onClose }: ShareModalProps) {
   )
 }
 
+// ─── Helper: Compute status from startsAt & expiresAt ─────────────────────────
+
+export const getPollStatus = (
+  startsAt?: string | Date | null,
+  expiresAt?: string | Date | null
+): 'active' | 'scheduled' | 'closed' => {
+  const now = Date.now()
+
+  if (expiresAt) {
+    const expireTime = new Date(expiresAt).getTime()
+    if (!isNaN(expireTime) && expireTime <= now) {
+      return 'closed'
+    }
+  }
+
+  if (startsAt) {
+    const startTime = new Date(startsAt).getTime()
+    if (!isNaN(startTime) && startTime > now) {
+      return 'scheduled'
+    }
+  }
+
+  return 'active'
+}
+
+const formatDate = (dateStr?: string | Date | null) => {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return String(dateStr)
+    return d.toISOString().split('T')[0]
+  } catch {
+    return String(dateStr)
+  }
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 const Lastsection = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'scheduled' | 'closed'>('all')
   const [isCreatePollOpen, setIsCreatePollOpen] = useState(false)
+
+  const { data: userAuth } = useCurrentUser()
+  const { data, isLoading, isError, refetch } = useAllPollsApi()
+console.log("polls data LOast section=",data);
+
+  // Transform backend API response into PollItem array
+  // API returns: { id, title, responseMode, startsAt, expiresAt, createdAt, ... }
+  // No "status" field — we derive it from startsAt & expiresAt
+  const polls: PollItem[] = useMemo(() => {
+    const rawPolls: any[] = Array.isArray(data?.data)? data.data: Array.isArray(data)? data: []
+ 
+    return rawPolls.map((poll: any) => {
+      const status: 'active' | 'scheduled' | 'closed' = getPollStatus(poll.startsAt, poll.expiresAt)
+
+      return {
+        id: String(poll.id),
+        title: poll.title || 'Untitled Poll',
+        status,
+        responseMode: (poll.responseMode as 'verified' | 'anonymous') || 'verified',
+        totalVotes: poll.totalVotes ?? 0,
+        createdAt: formatDate(poll.createdAt),
+        expiresAt: formatDate(poll.expiresAt),
+      }
+    })
+  }, [data])
 
   // ViewPoll state
   const [viewPoll, setViewPoll] = useState<PollDetail | null>(null)
@@ -469,23 +276,38 @@ const Lastsection = () => {
   }
 
   const openView = (pollId: string) => {
-    const detail = mockPollDetails[pollId]
-    if (detail) {
-      setViewPoll(detail)
-      setIsViewPollOpen(true)
+    const found = polls.find((p) => p.id === pollId)
+    if (found) {
+      setViewPoll({
+        id: found.id,
+        title: found.title,
+        status: found.status,
+        responseMode: found.responseMode,
+        isActive: found.status === 'active',
+        isPublished: true,
+        createdAt: found.createdAt,
+        expiresAt: found.expiresAt,
+        creatorId: userAuth?.user?.id || '',
+        totalVisitors: 0,
+        totalVoters: found.totalVotes,
+        questions: [],
+      })
     }
+    setIsViewPollOpen(true)
   }
 
-  const filteredPolls = mockPolls.filter((poll) => {
-    const matchesSearch =
-      poll.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      poll.responseMode.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredPolls = useMemo(() => {
+    return polls.filter((poll) => {
+      const matchesSearch =
+        poll.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        poll.responseMode.toLowerCase().includes(searchQuery.toLowerCase())
 
-    const matchesStatus =
-      statusFilter === 'all' ? true : poll.status === statusFilter
+      const matchesStatus =
+        statusFilter === 'all' ? true : poll.status === statusFilter
 
-    return matchesSearch && matchesStatus
-  })
+      return matchesSearch && matchesStatus
+    })
+  }, [polls, searchQuery, statusFilter])
 
   return (
     <>
@@ -493,7 +315,7 @@ const Lastsection = () => {
       <CreatePoll
         isOpen={isCreatePollOpen}
         onClose={() => setIsCreatePollOpen(false)}
-        creatorId="ec1eede4-43dd-4fc1-b9fc-0f8dc09dc0ea"
+        creatorId={userAuth?.user?.id || ""}
       />
       <ViewPoll
         isOpen={isViewPollOpen}
@@ -571,8 +393,8 @@ const Lastsection = () => {
           ).map((tab) => {
             const count =
               tab.key === 'all'
-                ? mockPolls.length
-                : mockPolls.filter((p) => p.status === tab.key).length
+                ? polls.length
+                : polls.filter((p) => p.status === tab.key).length
 
             const isActive = statusFilter === tab.key
 
@@ -602,8 +424,32 @@ const Lastsection = () => {
           })}
         </div>
 
-        {/* Content: When polls exist */}
-        {filteredPolls.length > 0 ? (
+        {/* Content */}
+        {isLoading ? (
+          <div className="py-16 px-4 text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
+            <p className="text-sm font-medium text-slate-500 dark:text-zinc-400">Loading polls...</p>
+          </div>
+        ) : isError && polls.length === 0 ? (
+          <div className="py-12 px-4 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 mx-auto mb-3">
+              <FileText size={22} />
+            </div>
+            <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">
+              Failed to load polls
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto mb-4">
+              Something went wrong while fetching your polls.
+            </p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs font-semibold text-white transition cursor-pointer"
+            >
+              Try again
+            </button>
+          </div>
+        ) : filteredPolls.length > 0 ? (
           <>
             {/* Desktop Table View (Visible on md and larger) */}
             <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200 dark:border-zinc-800">

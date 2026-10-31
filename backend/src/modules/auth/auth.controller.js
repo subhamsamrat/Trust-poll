@@ -3,6 +3,14 @@ import Api_response from "../../common/utils/Api_response.js";
 import Api_error from "../../common/utils/Api_error.js";
 import { userModel } from "./auth.model.js";
 
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  path: "/",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
 //register
 export const register = async (req, res, next) => {
   try {
@@ -22,12 +30,7 @@ export const login = async (req, res, next) => {
   try {
     const { user, accessToken, refreshToken } = await authService.login(req.body);
   
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
 
     Api_response.ok(res, "User logged in successfully", { user, accessToken });
   } catch (error) {
@@ -40,7 +43,9 @@ export const login = async (req, res, next) => {
 //refresh token
 export const refreshToken = async (req, res, next) => {
   try {
-    const token = req.cookies?.refreshToken;
+    // Support reading refresh token from cookies, body, or headers
+    const token = req.cookies?.refreshToken || req.body?.refreshToken || req.headers["x-refresh-token"];
+    console.log("refreshToken =", token);
 
     const { accessToken } = await authService.refresh(token);
 
@@ -57,11 +62,11 @@ export const logout = async (req, res, next) => {
   try {
     const user = await authService.logout(req.user.id);
     
-            res.clearCookie("refreshToken", {
-       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+    res.clearCookie("refreshToken", {
+      httpOnly: COOKIE_OPTIONS.httpOnly,
+      secure: COOKIE_OPTIONS.secure,
+      sameSite: COOKIE_OPTIONS.sameSite,
+      path: COOKIE_OPTIONS.path,
     });
     Api_response.ok(res, "User logged out successfully");
   } catch (error) {
@@ -80,4 +85,3 @@ export const getMe = async (req, res, next) => {
     next(error);
   }
 };
-

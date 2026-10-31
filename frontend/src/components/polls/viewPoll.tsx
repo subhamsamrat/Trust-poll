@@ -148,6 +148,8 @@ const ViewPoll = ({ isOpen, onClose, poll }: ViewPollProps) => {
     if (poll) setLocalQuestions(JSON.parse(JSON.stringify(poll.questions)))
   }, [poll])
 
+  useEffect(()=>{},[])
+  
   // Keyboard close + body scroll lock
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }

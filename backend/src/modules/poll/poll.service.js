@@ -184,9 +184,8 @@ export const get_all_poll = async (user) => {
     .from(pollTable)
     .where(eq(pollTable.creatorId, user.id));
 
-  if (!polls || polls.length === 0) {
-    throw Api_error.notFound("no polls found");
-  }
+  // return empty array if no polls
+  if (!polls) return [];
 
   return polls;
 };
@@ -263,7 +262,8 @@ export const get_poll_detail = async (pollId, req) => {
     throw Api_error.badrequest("Poll has expired");
   }
 
-  return { poll: poll, questions: await getQuestionsAndOptions(poll.id) }; //return poll and questions in required format
+  return { poll: poll,
+     questions: await getQuestionsAndOptions(poll.id) }; //return poll and questions in required format
 };
 
 //submit answer

@@ -33,7 +33,7 @@ export const register = async ({ name, email, password }) => {
 };
 
 // LOGIN
-export const login = async ({ email, password }) => {
+export const login = async ({ email, password }) => { 
   try {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email));
 
@@ -90,6 +90,13 @@ export const refresh = async (token) => {
 
     if (error instanceof Api_error) {
       throw error;
+    }
+
+    if (error.name === "TokenExpiredError") {
+      throw Api_error.unauthorized("Refresh token expired");
+    }
+    if (error.name === "JsonWebTokenError") {
+      throw Api_error.unauthorized("Invalid refresh token");
     }
 
     throw Api_error.internal("Internal server error");

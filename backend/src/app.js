@@ -7,12 +7,25 @@ import cors from 'cors';
 
 const app = express();
 
-app.use(express.json());
-app.use(cookieParser());
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  process.env.CLIENT_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: 'http://localhost:3000', // Replace with your frontend URL
+  origin: (origin, callback) => {
+    // allow requests with no origin (like mobile apps, curl, postman)
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, true); // Alternatively allow all in dev, or allow matched
+  },
   credentials: true, // Allow cookies to be sent
 }));
+
+app.use(express.json());
+app.use(cookieParser());
 
 app.get('/', (req, res) => {
   res.status(200).json({
@@ -22,9 +35,9 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/auth', auth_router); 
-app.use('/api/poll',poll_router);
+app.use('/api/poll', poll_router);
 //app.use('/api/poll/answer',);
 
 app.use(errorMiddleware);
 
-export default app; 
+export default app;

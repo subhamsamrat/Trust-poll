@@ -9,7 +9,7 @@ import {
 import Charts1 from '#/components/dashboard/charts1'
 import Lastsection from "#/components/dashboard/lastsection.tsx"
 import {useCurrentUser} from "#/lib/currentUser.ts"
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {socket}from '#/socket/socket'
 import { useNavigate } from '@tanstack/react-router'
 

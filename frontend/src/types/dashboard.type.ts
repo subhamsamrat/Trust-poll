@@ -13,3 +13,15 @@ export interface ShareModalProps {
   isOpen: boolean
   onClose: () => void
 }
+
+export type Polls= {
+  id: string;
+  title: string;
+  creatorId: string;
+  isPublished: boolean;
+  responseMode: 'verified' | 'anonymous'; // Use union if there are other modes like 'anonymous'
+  createdAt: string;                  // ISO Date string
+  updatedAt: string;                  // ISO Date string
+  startsAt: string;                   // ISO Date string
+  expiresAt: string;                  // ISO Date string
+}
