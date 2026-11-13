@@ -34,10 +34,4 @@ export const logoutApi = async () => {
     return response.data;
 }
 
-//get All polls
-export const getAllPollsApi = async () => {
-  console.log('get poll API call....');
-  const response = await axiosClient.get('/poll/all-polls');
-  console.log('get all polls response=',response);
-  return response.data.data;
-};
+

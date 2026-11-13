@@ -6,6 +6,7 @@ export interface PollItem {
   totalVotes: number
   createdAt: string
   expiresAt: string
+  startsAt: string;  
 }
 
 export interface ShareModalProps {

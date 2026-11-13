@@ -20,18 +20,18 @@ import {
 
 export const Route = createFileRoute('/answerPoll')({
   component: AnswerPoll,
-})
+})    
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface PollOption {
-  id: string
-  text: string
+  optionId: string
+  option: string
   voteCount: number
 }
 
 interface PollQuestion {
-  id: string
+  questionId: string
   question: string
   options: PollOption[]
 }
@@ -56,34 +56,34 @@ const MOCK_POLL: Poll = {
   status: 'active',
   responseMode: 'verified',
   isPublished: true,
-  expiresAt: '2026-10-20T23:59:59.000Z',
+  expiresAt: '2026-11-10T23:59:59.000Z',
   totalVoters: 486,
   questions: [
     {
-      id: 'q1',
+      questionId: 'q1',
       question: 'Which is your favorite LLM model?',
       options: [
-        { id: 'o1', text: 'ChatGPT', voteCount: 210 },
-        { id: 'o2', text: 'Gemini', voteCount: 165 },
-        { id: 'o3', text: 'Claude', voteCount: 111 },
+        { optionId: 'o1', option: 'ChatGPT', voteCount: 210 },
+        { optionId: 'o2', option: 'Gemini', voteCount: 165 },
+        { optionId: 'o3', option: 'Claude', voteCount: 111 },
       ],
     },
     {
-      id: 'q2',
+      questionId: 'q2',
       question: 'Which ORM/ODM do you use with Postgres?',
       options: [
-        { id: 'o4', text: 'Drizzle', voteCount: 240 },
-        { id: 'o5', text: 'Prisma', voteCount: 246 },
+        { optionId: 'o4', option: 'Drizzle', voteCount: 240 },
+        { optionId: 'o5', option: 'Prisma', voteCount: 246 },
       ],
     },
     {
-      id: 'q3',
+      questionId: 'q3',
       question: 'What is your primary frontend framework?',
       options: [
-        { id: 'o6', text: 'React / Next.js', voteCount: 310 },
-        { id: 'o7', text: 'Vue / Nuxt', voteCount: 90 },
-        { id: 'o8', text: 'Angular', voteCount: 55 },
-        { id: 'o9', text: 'Svelte', voteCount: 31 },
+        { optionId: 'o6', option: 'React / Next.js', voteCount: 310 },
+        { optionId: 'o7', option: 'Vue / Nuxt', voteCount: 90 },
+        { optionId: 'o8', option: 'Angular', voteCount: 55 },
+        { optionId: 'o9', option: 'Svelte', voteCount: 31 },
       ],
     },
   ],
@@ -184,13 +184,13 @@ function TimeUnit({ value, label }: { value: number; label: string }) {
 // ─── Results bar ──────────────────────────────────────────────────────────────
 
 function ResultBar({
-  text,
+  optId,
   count,
   total,
   chosen,
   isWinner,
 }: {
-  text: string
+  optId: string
   count: number
   total: number
   chosen: boolean
@@ -225,7 +225,7 @@ function ResultBar({
             <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300 dark:border-zinc-600 shrink-0" />
           )}
           <span className={`text-sm font-semibold truncate ${chosen ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-zinc-200'}`}>
-            {text}
+            {optId}
           </span>
         </div>
         <div className="shrink-0 text-right">
@@ -387,12 +387,17 @@ export default function AnswerPoll() {
   const [showShare, setShowShare] = useState(false)
 
   const countdown = useCountdown(poll.expiresAt)
-  const allAnswered = poll.questions.every((q) => answers[q.id])
+  const allAnswered = poll.questions.every((q) => answers[q.questionId])
 
   const choose = (questionId: string, optionId: string) => {
     if (submitted || countdown.expired || poll.status === 'closed') return
     setAnswers((prev) => ({ ...prev, [questionId]: optionId }))
   }
+  
+  useEffect(()=>{
+     
+  },[])
+  
 
   const submit = async () => {
     if (!allAnswered || submitting) return
@@ -434,10 +439,10 @@ export default function AnswerPoll() {
   }
 
   const getTotals = (q: PollQuestion) => {
-    const chosen = answers[q.id]
+    const chosen = answers[q.questionId]
     const options = q.options.map((o) => ({
       ...o,
-      voteCount: o.id === chosen ? o.voteCount + 1 : o.voteCount,
+      voteCount: o.optionId === chosen ? o.voteCount + 1 : o.voteCount,
     }))
     const total = options.reduce((s, o) => s + o.voteCount, 0)
     const max = Math.max(...options.map((o) => o.voteCount))
@@ -539,11 +544,11 @@ export default function AnswerPoll() {
 
                   {poll.questions.map((q, qIdx) => {
                     const { options, total, max } = getTotals(q)
-                    const chosen = answers[q.id]
+                    const chosen = answers[q.questionId]
 
                     return (
                       <div
-                        key={q.id}
+                        key={q.questionId}
                         className="rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-sm"
                       >
                         <div className="flex items-start gap-2 mb-4">
@@ -557,11 +562,11 @@ export default function AnswerPoll() {
                         <div className="space-y-2.5">
                           {options.map((opt) => (
                             <ResultBar
-                              key={opt.id}
-                              text={opt.text}
+                              key={opt.optionId}
+                              optId={opt.optionId}
                               count={opt.voteCount}
                               total={total}
-                              chosen={opt.id === chosen}
+                              chosen={opt.optionId === chosen}
                               isWinner={opt.voteCount === max && max > 0}
                             />
                           ))}
@@ -620,12 +625,12 @@ export default function AnswerPoll() {
               {/* Questions */}
               <div className="space-y-4">
                 {poll.questions.map((q, qIdx) => {
-                  const chosen = answers[q.id]
+                  const chosen = answers[q.questionId]
                   const answered = !!chosen
 
                   return (
                     <div
-                      key={q.id}
+                      key={q.questionId}
                       className={`rounded-2xl border bg-white dark:bg-zinc-900 p-5 shadow-sm transition-all ${
                         answered
                           ? 'border-blue-300 dark:border-blue-500/40'
@@ -649,15 +654,15 @@ export default function AnswerPoll() {
 
                       <div className="space-y-2.5 pl-8">
                         {q.options.map((opt, oIdx) => {
-                          const isChosen = chosen === opt.id
+                          const isChosen = chosen === opt.optionId
                           const disabled = isExpiredOrClosed
 
                           return (
                             <button
-                              key={opt.id}
+                              key={opt.optionId}
                               type="button"
                               disabled={disabled}
-                              onClick={() => choose(q.id, opt.id)}
+                              onClick={() => choose(q.questionId, opt.optionId)}
                               className={`
                                 w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left
                                 transition-all duration-150 group
@@ -694,7 +699,7 @@ export default function AnswerPoll() {
                                   isChosen ? 'text-blue-700 dark:text-blue-200' : 'text-slate-800 dark:text-zinc-200'
                                 }`}
                               >
-                                {opt.text}
+                                {opt.option}
                               </span>
 
                               {isChosen && <CheckCircle2 size={16} className="shrink-0 text-blue-500" />}
@@ -743,69 +748,6 @@ export default function AnswerPoll() {
               )}
             </>
           )}
-
-          {/* ── Share & QR Code Card at the End (Correctly Aligned & Centered) ── */}
-          <div
-            id="poll-qr-section"
-            className="rounded-3xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 sm:p-8 shadow-sm flex flex-col items-center text-center"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 mb-3">
-              <QrCode size={24} />
-            </div>
-
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-              Share this Poll
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 mb-5 max-w-sm">
-              Scan the QR code with your mobile camera or copy the link below to share with others.
-            </p>
-
-            {/* QR Code Container - centered */}
-            <div className="flex items-center justify-center mb-3">
-              <div className="p-4 bg-white rounded-3xl border-2 border-slate-200/90 dark:border-zinc-700 shadow-sm flex items-center justify-center">
-                <QRCodeSVG
-                  value={pollUrl}
-                  size={190}
-                  level="M"
-                  marginSize={1}
-                  bgColor="#ffffff"
-                  fgColor="#000000"
-                />
-              </div>
-            </div>
-
-            <p className="text-[11px] font-medium text-slate-400 dark:text-zinc-500 mb-5">
-              Scan with any smartphone camera
-            </p>
-
-            {/* Copy URL Row */}
-            <div className="w-full max-w-md">
-              <CopyUrlRow url={pollUrl} />
-            </div>
-
-            {/* Native share button if supported */}
-            {typeof navigator !== 'undefined' && 'share' in navigator && (
-              <div className="w-full max-w-md mt-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator
-                      .share({
-                        title: poll.title,
-                        text: `Vote on "${poll.title}"!`,
-                        url: pollUrl,
-                      })
-                      .catch(() => {})
-                  }}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-200 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-zinc-700 transition cursor-pointer"
-                >
-                  <ExternalLink size={14} />
-                  <span>Share via Other Apps…</span>
-                </button>
-              </div>
-            )}
-          </div>
-
         </div>
       </div>
     </>

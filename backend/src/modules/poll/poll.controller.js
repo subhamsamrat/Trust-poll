@@ -42,7 +42,7 @@ export const update_poll = async (req, res, next) => {
     if (req?.params?.pollId) {
       const response = await PollService.update_poll(req.params.pollId,req.user, req.body);
       if (response.success) {
-        Api_response.ok(res, "poll updated successfully");
+        Api_response.ok(res, "poll updated successfully", response);
       }
     } else {
       throw Api_error.notFound("Required data missing");
@@ -93,7 +93,7 @@ export const get_all_poll = async (req, res, next) => {
 //get poll detail
 export const get_poll_detail = async (req, res, next) => {
   try { 
-    if (req?.params?.pollId) {
+    if(req?.params?.pollId){
       const poll = await PollService.get_poll_detail(req.params.pollId, req);
       Api_response.ok(res, "Poll detail retrieved successfully", poll);
     } else {
@@ -166,4 +166,4 @@ export const get_poll_results = async (req, res, next) => {
     console.log("error in getting poll results", error);
     return next(error);
   }
-};
+};

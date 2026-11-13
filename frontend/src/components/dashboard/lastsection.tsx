@@ -20,7 +20,7 @@ import CreatePoll from "#/components/polls/createPoll"
 import ViewPoll, { type PollDetail } from "#/components/polls/viewPoll"
 import type { PollItem, ShareModalProps,Polls } from "#/types/dashboard.type"
 import { useCurrentUser } from "#/lib/currentUser"
-import { useAllPollsApi } from "#/hooks/auth.hook"
+import { useAllPollsApi } from "#/hooks/dashboard.hook"
 
 // ─── Share Modal Component ──────────────────────────────────────────────────
 
@@ -211,6 +211,8 @@ export const getPollStatus = (
 
   if (startsAt) {
     const startTime = new Date(startsAt).getTime()
+    console.log("time time time XXXXXXXX:",startTime);
+    
     if (!isNaN(startTime) && startTime > now) {
       return 'scheduled'
     }
@@ -239,7 +241,6 @@ const Lastsection = () => {
 
   const { data: userAuth } = useCurrentUser()
   const { data, isLoading, isError, refetch } = useAllPollsApi()
-console.log("polls data LOast section=",data);
 
   // Transform backend API response into PollItem array
   // API returns: { id, title, responseMode, startsAt, expiresAt, createdAt, ... }
@@ -256,6 +257,7 @@ console.log("polls data LOast section=",data);
         status,
         responseMode: (poll.responseMode as 'verified' | 'anonymous') || 'verified',
         totalVotes: poll.totalVotes ?? 0,
+        startsAt:poll.startsAt,
         createdAt: formatDate(poll.createdAt),
         expiresAt: formatDate(poll.expiresAt),
       }
@@ -284,9 +286,9 @@ console.log("polls data LOast section=",data);
         status: found.status,
         responseMode: found.responseMode,
         isActive: found.status === 'active',
-        isPublished: true,
         createdAt: found.createdAt,
         expiresAt: found.expiresAt,
+        startsAt:found.startsAt,
         creatorId: userAuth?.user?.id || '',
         totalVisitors: 0,
         totalVoters: found.totalVotes,

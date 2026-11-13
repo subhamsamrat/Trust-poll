@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getAllPollsApi, loginApi, signupApi } from '../api/auth.api.ts'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { loginApi, signupApi } from '../api/auth.api.ts'
 import { toast } from '@heroui/react'
 import { useNavigate } from '@tanstack/react-router'
 import { setStoredUser } from '../lib/currentUser.ts'
@@ -46,15 +46,5 @@ export function useLoginUser() {
         err.response?.data?.message || err.message || 'Something went wrong'
       toast.danger(errorMessage)
     },
-  })
-}
-
-// Get All Polls Query Hook
-export function useAllPollsApi() {
-  console.log("get all poll hook called");
-  return useQuery({
-    queryKey: ['getAllPolls'],
-    queryFn: getAllPollsApi,
-     staleTime: 1000 * 60 * 5,   
   })
 }

@@ -20,7 +20,7 @@ poll_router.get("/results/:pollId",optionalAuthMiddleware,Poll_controller.get_po
 
 
 
-poll_router.post("/visit/:pollId",optionalAuthMiddleware,Poll_controller.visit_poll);  
+poll_router.get("/visit/:pollId",optionalAuthMiddleware,Poll_controller.visit_poll);  
 poll_router.post("/vote/:pollId",optionalAuthMiddleware,dto_middleware(answer_dto),Poll_controller.answer_poll);
 export default poll_router;
  

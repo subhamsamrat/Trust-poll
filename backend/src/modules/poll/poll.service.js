@@ -55,7 +55,7 @@ export const create_poll = async ({ body, created_by }) => {
   try {
     if (io && created_by) {
       const updatedDashboardData = await dashboard(created_by);
-
+       
       io.to(dashboardRoom(created_by)).emit("dashboard", updatedDashboardData);
     }
   } catch (emitError) {
@@ -106,44 +106,202 @@ export const update_poll = async (pollId, user, body) => {
   if (isExist.creatorId !== user.id) {
     throw Api_error.unauthorized("You are not authorized to update this poll");
   }
+
+  // If questions are being updated, ensure poll doesn't have answers/votes already
+  if (body.questions !== undefined) {
+    if (!Array.isArray(body.questions) || body.questions.length === 0) {
+      throw Api_error.badRequest("Poll must have at least one question");
+    }
+
+    // Validate questions and options structure
+    for (const q of body.questions) {
+      const qText = (q.question || q.text || "").trim();
+      if (!qText) {
+        throw Api_error.badRequest("Question text cannot be empty");
+      }
+      const options = Array.isArray(q.options) ? q.options : [];
+      if (options.length < 2) {
+        throw Api_error.badRequest("Each question must have at least two options");
+      }
+      for (const o of options) {
+        const oText = (o.option ?? o.text ?? "").trim();
+        if (!oText) {
+          throw Api_error.badRequest("Option text cannot be empty");
+        }
+      }
+    }
+
+    const [hasVotes] = await db
+      .select({ id: answerTable.id })
+      .from(answerTable)
+      .where(eq(answerTable.pollId, pollId))
+      .limit(1);
+
+    if (hasVotes) {
+      throw Api_error.badRequest(
+        "Cannot edit questions because votes have already been cast for this poll",
+      );
+    }
+  }
+
   const newIsPublished =
     body.isPublished !== undefined
       ? Boolean(body.isPublished)
       : isExist.isPublished;
 
-  const [updatedPoll] = await db
-    .update(pollTable)
-    .set({
-      isPublished: newIsPublished,
-    })
-    .where(eq(pollTable.id, isExist.id))
-    .returning({ id: pollTable.id, isPublished: pollTable.isPublished });
+  await db.transaction(async (tx) => {
+    const updateFields = {};
+    if (body.isPublished !== undefined) {
+      updateFields.isPublished = newIsPublished;
+    }
+    if (body.title !== undefined && typeof body.title === "string" && body.title.trim()) {
+      updateFields.title = body.title.trim();
+    }
+    if (body.startsAt !== undefined) {
+      updateFields.startsAt = new Date(body.startsAt);
+    }
+    if (body.expiresAt !== undefined) {
+      updateFields.expiresAt = new Date(body.expiresAt);
+    }
+    updateFields.updatedAt = new Date();
 
-  if (updatedPoll.id) {
-    // Broadcast updated results over socket.io
-    await broadcast_poll_results(pollId);
-    if (newIsPublished) {
-      try {
-        const results = await get_poll_results(pollId, user);
-        getIO().to(`poll:${pollId}`).emit("results_published", results);
-        console.log(
-          `[Socket.io] Broadcasted results_published for poll ${pollId}`,
+    await tx
+      .update(pollTable)
+      .set(updateFields)
+      .where(eq(pollTable.id, isExist.id));
+
+    // Handle questions and options update if questions array provided
+    if (body.questions !== undefined) {
+      const existingQuestions = await tx
+        .select()
+        .from(questionTable)
+        .where(eq(questionTable.pollId, pollId));
+      const existingQuestionMap = new Map(existingQuestions.map((q) => [q.id, q]));
+      const existingQuestionIds = Array.from(existingQuestionMap.keys());
+
+      const existingOptions =
+        existingQuestionIds.length > 0
+          ? await tx
+              .select()
+              .from(optionTable)
+              .where(inArray(optionTable.questionId, existingQuestionIds))
+          : [];
+
+      const existingOptionMap = new Map(existingOptions.map((o) => [o.id, o]));
+      const keptQuestionIds = new Set();
+
+      for (const q of body.questions) {
+        const qTitle = (q.question || q.text || "").trim();
+        const qId = q.Qid || q.id;
+        let questionId = qId;
+
+        if (qId && existingQuestionMap.has(qId)) {
+          // Update existing question
+          await tx
+            .update(questionTable)
+            .set({ question: qTitle })
+            .where(eq(questionTable.id, qId));
+          keptQuestionIds.add(qId);
+        } else {
+          // Insert new question
+          const [newQ] = await tx
+            .insert(questionTable)
+            .values({
+              pollId: pollId,
+              question: qTitle,
+            })
+            .returning({ id: questionTable.id });
+          questionId = newQ.id;
+          keptQuestionIds.add(questionId);
+        }
+
+        const keptOptionIds = new Set();
+        const qOptions = Array.isArray(q.options) ? q.options : [];
+
+        for (const o of qOptions) {
+          const oText = (o.option ?? o.text ?? "").trim();
+          const oId = o.Oid || o.id;
+
+          if (
+            oId &&
+            existingOptionMap.has(oId) &&
+            existingOptionMap.get(oId).questionId === questionId
+          ) {
+            // Update existing option
+            await tx
+              .update(optionTable)
+              .set({ option: oText })
+              .where(eq(optionTable.id, oId));
+            keptOptionIds.add(oId);
+          } else {
+            // Insert new option
+            const [newO] = await tx
+              .insert(optionTable)
+              .values({
+                questionId: questionId,
+                option: oText,
+              })
+              .returning({ id: optionTable.id });
+            keptOptionIds.add(newO.id);
+          }
+        }
+
+        // Delete removed options for this question
+        const optionsToDelete = existingOptions.filter(
+          (o) => o.questionId === questionId && !keptOptionIds.has(o.id),
         );
-      } catch (err) {
-        console.log("Socket emit error on poll update:", err.message);
+        if (optionsToDelete.length > 0) {
+          await tx
+            .delete(optionTable)
+            .where(inArray(optionTable.id, optionsToDelete.map((o) => o.id)));
+        }
+      }
+
+      // Delete removed questions for this poll
+      const questionsToDelete = existingQuestions.filter(
+        (q) => !keptQuestionIds.has(q.id),
+      );
+      if (questionsToDelete.length > 0) {
+        await tx
+          .delete(questionTable)
+          .where(inArray(questionTable.id, questionsToDelete.map((q) => q.id)));
       }
     }
-    return {
-      success: true,
-      pollId: updatedPoll.id,
-      isPublished: updatedPoll.isPublished,
-    };
+  });
+
+  // Broadcast updated results over socket.io
+  try {
+    await broadcast_poll_results(pollId);
+    if (newIsPublished) {
+      const results = await get_poll_results(pollId, user);
+      getIO().to(`poll:${pollId}`).emit("results_published", results);
+      console.log(
+        `[Socket.io] Broadcasted results_published for poll ${pollId}`,
+      );
+    }
+    const io = getIO();
+    if (io && user?.id) {
+      const updatedDashboardData = await dashboard(user.id);
+      io.to(dashboardRoom(user.id)).emit("dashboard", updatedDashboardData);
+    }
+  } catch (err) {
+    console.log("Socket emit error on poll update:", err.message);
   }
-  return { success: false };
+
+  const updatedDetail = await get_poll_detail(pollId, { user });
+
+  return {
+    success: true,
+    pollId: isExist.id,
+    isPublished: newIsPublished,
+    poll: updatedDetail.poll,
+    questions: updatedDetail.questions,
+  };
 };
 
 //visit
 export const visit_poll = async (pollId, user) => {
+  const io=getIO();
   const [poll] = await db
     .select()
     .from(pollTable)
@@ -154,18 +312,27 @@ export const visit_poll = async (pollId, user) => {
 
   if (poll.responseMode === "verified") {
     if (!user) {
-      throw Api_error.unauthorized("You need to login to visit this poll");
+      throw Api_error.unauthorized("You need login to visit this poll");
     }
-    return { success: true, mode: "verified", visitorId: null };
   } else if (poll.responseMode === "anonymous") {
     const visitId = await Generate_visitorId();
-    //insted of store in db we can store in redis for better performance
+    // instead of store in db we can store in redis for better performance
     await db.insert(visitorTable).values({
       pollId: pollId,
       visitorId: visitId.rawId,
     });
-    return { success: true, mode: "anonymous", visitorId: visitId.rawId };
+   
   }
+ try {
+    if (io) {
+      const updatedDashboardData = await dashboard(created_by);
+
+      io.to(dashboardRoom(created_by)).emit("dashboard", updatedDashboardData);
+    }
+  } catch (emitError) {
+    console.error("Failed to broadcast dashboard update:", emitError);
+  }
+   return { success: true, mode: "anonymous", visitorId: visitId.rawId };
 };
 
 //get all poll
@@ -272,6 +439,7 @@ export const submit_ans = async (pollId, user, answer, visitorId) => {
   const data= await db.transaction(async (tx) => {
     //check if user is verified or anonymous
     let submittedBy = { verifiedUser: null, anonymousUser: null };
+
     if (user?.id) {
       submittedBy.verifiedUser = user.id;
     } else if (visitorId && user === null) {
@@ -301,6 +469,13 @@ export const submit_ans = async (pollId, user, answer, visitorId) => {
     if (!poll) {
       throw Api_error.notFound("poll does not exist");
     }
+    
+    if (poll.startsAt > new Date()) {
+      throw Api_error.badrequest("Poll is not active yet.");
+    } else if (poll.expiresAt < new Date()) {
+      throw Api_error.badrequest("Poll has expired.");
+    }
+
     if (poll.responseMode === "verified" && !user?.id) {
       throw Api_error.unauthorized(
         "You must be logged in to answer this poll.",
@@ -309,12 +484,6 @@ export const submit_ans = async (pollId, user, answer, visitorId) => {
 
     if (poll.responseMode === "anonymous" && !visitorId) {
       throw Api_error.unauthorized("Visitor verification failed.");
-    }
-
-    if (poll.startsAt > new Date()) {
-      throw Api_error.badRequest("Poll is not active yet.");
-    } else if (poll.expiresAt < new Date()) {
-      throw Api_error.badRequest("Poll has expired.");
     }
 
     if (
@@ -366,7 +535,7 @@ export const submit_ans = async (pollId, user, answer, visitorId) => {
       }
     }
 
-    //check same user aleardy submitted or not answer
+    //check same user already submitted or not answer
     const condition = submittedBy.verifiedUser
       ? and(
           eq(answerTable.verifiedUser, submittedBy.verifiedUser),
@@ -411,8 +580,11 @@ export const submit_ans = async (pollId, user, answer, visitorId) => {
    try {
     if (io && data.poll?true:false) {
       const updatedDashboardData = await dashboard(data.poll.creatorId);
-
+       const particularPollDetail=await get_poll_results(data.poll.id,data.poll.creatorId)
+       const broadcastResult=await get_poll_results(data.poll.id)
       io.to(dashboardRoom(data.poll.creatorId)).emit("dashboard", updatedDashboardData);
+      io.to(`poll:${data.poll.id}`).emit("poll_results", broadcastResult);
+      io.to(`poll:${data.poll.id}:creator`).emit("poll_results", particularPollDetail);
     }
   } catch (emitError) {
     console.error("Failed to broadcast dashboard update:", emitError);
@@ -520,6 +692,14 @@ export const dashboard = async (userId) => {
     totalVoters: totalVotersSet.size,
     topPerformingPolls,
     last5Polls,
+    allPollsStats: polls.map((p) => ({
+      id: p.id,
+      visitors: Math.max(
+        pollVisitorsMap.get(p.id)?.size || 0,
+        pollVotersMap.get(p.id)?.size || 0,
+      ),
+      voters: pollVotersMap.get(p.id)?.size || 0,
+    })),
   };
 };
 
@@ -578,9 +758,9 @@ export const get_poll_results = async (pollId, reqUser = null) => {
     throw Api_error.notFound("Poll not found");
   }
 
-  const isCreator = reqUser && poll.creatorId === reqUser.id;
+  const isCreator = reqUser && poll.creatorId === reqUser;
 
-  const questions = await db
+  const questions = await db           
     .select()
     .from(questionTable)
     .where(eq(questionTable.pollId, pollId));
@@ -591,12 +771,12 @@ export const get_poll_results = async (pollId, reqUser = null) => {
 
   const questionIds = questions.map((q) => q.id);
 
-  const options = await db
+  const options = await db //++++  not need
     .select()
     .from(optionTable)
     .where(inArray(optionTable.questionId, questionIds));
 
-  const answers = await db
+  const answers = await db 
     .select()
     .from(answerTable)
     .where(eq(answerTable.pollId, pollId));
@@ -606,9 +786,12 @@ export const get_poll_results = async (pollId, reqUser = null) => {
     const voterId = ans.verifiedUser || ans.anonymousUser;
     if (voterId) uniqueVotersSet.add(voterId);
   });
-  const totalVoters = uniqueVotersSet.size;
+  const totalVoters = uniqueVotersSet.size;   // TARGET DATA
+  const pollVisitors = await db.select().from(visitorTable).where(eq(visitorTable.pollId, pollId));
+  const rawVisitors = new Set(pollVisitors.map((v) => v.visitorId)).size;
+  const totalVisitors = Math.max(rawVisitors, totalVoters);
 
-  const optionVoteCounts = new Map();
+  const optionVoteCounts = new Map(); //TARGET DATA
   answers.forEach((ans) => {
     const count = optionVoteCounts.get(ans.answer) || 0;
     optionVoteCounts.set(ans.answer, count + 1);
@@ -620,7 +803,7 @@ export const get_poll_results = async (pollId, reqUser = null) => {
     questionVoteCounts.set(ans.questionId, count + 1);
   });
 
-  const formattedQuestions = questions.map((q) => {
+  const formattedQuestions = questions.map((q) => { //TARGET DATA
     const qOptions = options.filter((o) => o.questionId === q.id);
     const qTotalVotes = questionVoteCounts.get(q.id) || 0;
 
@@ -652,11 +835,13 @@ export const get_poll_results = async (pollId, reqUser = null) => {
     title: poll.title,
     isPublished: poll.isPublished,
     canViewResults: isCreator || poll.isPublished,
+    startsAt:poll.startsAt,
     message:
       isCreator || poll.isPublished
         ? "Results fetched successfully"
         : "Results are not published yet by the host",
     totalVoters: isCreator || poll.isPublished ? totalVoters : null,
+    totalVisitors: isCreator || poll.isPublished ? totalVisitors : null,
     questions: formattedQuestions,
   };
 };
@@ -681,6 +866,7 @@ export const broadcast_poll_results = async (pollId) => {
     io.to(`poll:${pollId}`).emit("vote_count_update", {
       pollId,
       totalVoters: publicResults.totalVoters,
+      totalVisitors: publicResults.totalVisitors,
     });
 
     // Fetch creator poll results for creator room
